@@ -1,0 +1,8 @@
+﻿<Driver type="c4z" name="WLED (1)">
+ <Items>
+  <Item type="dir" c4zDir="icons" name="icons" recurse="true" exclude="false" />
+  <Item type="dir" c4zDir="www" name="www" recurse="true" exclude="false" />
+  <Item type="file" name="driver.xml" />
+  <Item type="file" name="script.lua" />
+ </Items>
+</Driver>

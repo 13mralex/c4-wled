@@ -1,0 +1,210 @@
+<devicedata>
+  <version>3</version>
+  <manufacturer>AirCookie</manufacturer>
+  <model>WLED</model>
+  <creator>Alex Martin</creator>
+  <small>devices_sm\dimmer.gif</small>
+  <large>devices_lg/C4.gif</large>
+  <control>lua_gen</control>
+  <controlmethod>ip</controlmethod>
+  <driver>DriverWorks</driver>
+  <copyright>Copyright 2004-2014 Control4 Corporation.  All rights reserved.</copyright>
+  <created>11/30/2020 8:59 PM</created>
+  <modified>01/09/2021 10:18 PM</modified>
+  <config>
+    <script file="script.lua"></script>
+    <properties>
+      <property>
+        <name>IP Address 1</name>
+        <type>STRING</type>
+        <default></default>
+        <readonly>false</readonly>
+      </property>
+      <property>
+        <name>IP Address 2</name>
+        <type>STRING</type>
+        <default></default>
+        <readonly>false</readonly>
+      </property>
+      <property>
+        <name>IP Address 3</name>
+        <type>STRING</type>
+        <default></default>
+        <readonly>false</readonly>
+      </property>
+      <property>
+        <name>IP Address 4</name>
+        <type>STRING</type>
+        <default></default>
+        <readonly>false</readonly>
+      </property>
+      <property>
+        <name>IP Address 5</name>
+        <type>STRING</type>
+        <default></default>
+        <readonly>false</readonly>
+      </property>
+      <property>
+        <name>Default Color</name>
+        <type>COLOR_SELECTOR</type>
+        <default>255,255,255</default>
+      </property>
+      <property>
+        <name>Default White Value</name>
+        <type>RANGED_INTEGER</type>
+        <default>255</default>
+        <minimum>0</minimum>
+        <maximum>255</maximum>
+      </property>
+      <property>
+        <name>Default Effect</name>
+        <type>STRING</type>
+        <default>0</default>
+        <readonly>false</readonly>
+      </property>
+    </properties>
+    <actions>
+      <action>
+        <name>Set Full White</name>
+        <command>fullwhite</command>
+      </action>
+      <action>
+        <name>Hello World</name>
+        <command>helloworld</command>
+      </action>
+    </actions>
+    <commands>
+      <command>
+        <name>Set Color</name>
+        <description>Set NAME Color: RGB: PARAM1 W: PARAM2 D: PARAM3</description>
+        <params>
+          <param>
+            <name>RGB</name>
+            <type>COLOR_SELECTOR</type>
+            <default></default>
+          </param>
+          <param>
+            <name>White</name>
+            <type>RANGED_INTEGER</type>
+            <default></default>
+            <minimum>0</minimum>
+            <maximum>255</maximum>
+          </param>
+          <param>
+            <name>Dimmer</name>
+            <type>RANGED_INTEGER</type>
+            <default></default>
+            <minimum>0</minimum>
+            <maximum>255</maximum>
+          </param>
+        </params>
+      </command>
+      <command>
+        <name>Set Effect</name>
+        <description>Set NAME: Effect PARAM1</description>
+        <params>
+          <param>
+            <name>Effect Index</name>
+            <type>STRING</type>
+            <default></default>
+          </param>
+        </params>
+      </command>
+      <command>
+        <name>Set Preset</name>
+        <description>Set NAME Preset: PARAM1</description>
+        <params>
+          <param>
+            <name>Preset ID</name>
+            <type>STRING</type>
+            <default></default>
+          </param>
+        </params>
+      </command>
+    </commands>
+  </config>
+  <capabilities>
+    <dimmer>True</dimmer>
+    <set_level>True</set_level>
+    <on_off>True</on_off>
+    <advanced_scene_support>True</advanced_scene_support>
+    <load_group_support>True</load_group_support>
+    <hide_proxy_properties>False</hide_proxy_properties>
+    <hide_proxy_events>False</hide_proxy_events>
+    <ramp_level>True</ramp_level>
+    <min_max>False</min_max>
+    <hold_rate>False</hold_rate>
+    <click_rates>True</click_rates>
+  </capabilities>
+  <search_types />
+  <proxies qty="1">
+    <proxy proxybindingid="5001" smimagepath="devices_sm\dimmer.gif" lgimagepath="devices_lg\dimmer.gif" name="WLED" primary="True">light_v2</proxy>
+  </proxies>
+  <name>WLED IP Control</name>
+  <composer_categories>
+    <category>Lighting</category>
+    <category>User Interface</category>
+  </composer_categories>
+  <connections>
+    <connection>
+      <type>1</type>
+      <id>300</id>
+      <audiosource>false</audiosource>
+      <videosource>false</videosource>
+      <connectionname>Top Button Link</connectionname>
+      <facing>1</facing>
+      <consumer>false</consumer>
+      <linelevel>false</linelevel>
+      <classes>
+        <class>
+          <classname>BUTTON_LINK</classname>
+        </class>
+      </classes>
+    </connection>
+    <connection>
+      <type>1</type>
+      <id>301</id>
+      <audiosource>false</audiosource>
+      <videosource>false</videosource>
+      <connectionname>Toggle Button Link</connectionname>
+      <facing>1</facing>
+      <consumer>false</consumer>
+      <linelevel>false</linelevel>
+      <classes>
+        <class>
+          <classname>BUTTON_LINK</classname>
+        </class>
+      </classes>
+    </connection>
+    <connection>
+      <type>1</type>
+      <id>302</id>
+      <audiosource>false</audiosource>
+      <videosource>false</videosource>
+      <connectionname>Bottom Button Link</connectionname>
+      <facing>1</facing>
+      <consumer>false</consumer>
+      <linelevel>false</linelevel>
+      <classes>
+        <class>
+          <classname>BUTTON_LINK</classname>
+        </class>
+      </classes>
+    </connection>
+    <connection>
+      <type>2</type>
+      <id>5001</id>
+      <audiosource>false</audiosource>
+      <videosource>false</videosource>
+      <connectionname>WLED</connectionname>
+      <facing>1</facing>
+      <consumer>false</consumer>
+      <linelevel>false</linelevel>
+      <classes>
+        <class>
+          <classname>LIGHT_V2</classname>
+        </class>
+      </classes>
+    </connection>
+  </connections>
+</devicedata>
