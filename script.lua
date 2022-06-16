@@ -1,654 +1,456 @@
+require "json"
+JSON=(loadstring(json.JSON_LIBRARY_CHUNK))()
+
+do	--Globals
+	OPC = OPC or {}
+	EC = EC or {}
+	RFP = RFP or {}
+	WLED = {}
+	DeviceID = nil
+	PersistData["Scenes"] = PersistData["Scenes"] or {}
+end
+
+function dbg (strDebugText, ...)
+     if (Properties["Debug Mode"] == 'On') then
+		DEBUGPRINT = true
+	end
+
+	if (DEBUGPRINT) then print (os.date ('%x %X : ')..(strDebugText or ''), ...) end
+end
+
 function OnDriverInit()
-     print("Driver init...")
+
+     --C4:AddVariable("PRESET_LEVEL",0,"NUMBER",false,true)
+	--C4:AddVariable("CLICK_RATE_UP",0,"NUMBER",false,true)
+	--C4:AddVariable("CLICK_RATE_DOWN",0,"NUMBER",false,true)
+
+end
+
+function OnDriverLateInit()
+
+     dbg("On driver late init...")
 	
-     C4:AddVariable("DIMMER_LEVEL", "0", "INT")
-     C4:AddVariable("RED_LEVEL", "0", "INT")
-     C4:AddVariable("GREEN_LEVEL", "0", "INT")
-     C4:AddVariable("BLUE_LEVEL", "0", "INT")
-     C4:AddVariable("WHITE_LEVEL", "0", "INT")
-	C4:AddVariable("EFFECT", "0", "INT")
-	C4:AddVariable("UPDATE", "0", "BOOL")
-	sceneCollection = PersistData["sceneCollection"] or {}
-     flashCollection = PersistData["flashCollection"] or {}
-     elementCounter = 0
-     currentScene = 0
-     executeElementTimer = 0
+	DeviceID = C4:GetDeviceID()
+	ProxyID = C4:GetProxyDevicesById(DeviceID)
+
+     WLED.GetDeviceInfo()
+
+end
+
+function ConversionScale(level)
+
+     level = tonumber(level)
+     level = (level/100)*255
+     level = math.floor(level)
+	return level
+
+end
+
+function ReceivedFromProxy (idBinding, strCommand, tParams)
+	strCommand = strCommand or ''
+	tParams = tParams or {}
+	local args = {}
+	if (tParams.ARGS) then
+		local parsedArgs = C4:ParseXml(tParams.ARGS)
+		for _, v in pairs(parsedArgs.ChildNodes) do
+			args[v.Attributes.name] = v.Value
+		end
+		tParams.ARGS = nil
+	end
+	if (DEBUGPRINT) then
+		local output = {"--- ReceivedFromProxy: "..idBinding, strCommand, "----PARAMS----"}
+		for k, v in pairs(tParams) do table.insert(output, tostring(k).." = "..tostring(v)) end
+		table.insert(output, "-----ARGS-----")
+		for k, v in pairs(args) do table.insert(output, tostring(k).." = "..tostring(v)) end
+		table.insert(output, "---")
+		print (table.concat(output, "\r\n"))
+	end
+     local success, ret
+	--strProperty = string.gsub (strProperty, '%s+', '_')
+	if (RFP and RFP [strCommand] and type (RFP [strCommand]) == 'function') then
+		success, ret = pcall (RFP [strCommand], tParams)
+	end
+	if (success == true) then
+		return (ret)
+	elseif (success == false) then
+		print ('ReceivedFromProxy Lua error: ', strCommand, ret)
+	end
+end
+
+function RFP.RAMP_TO_LEVEL(tParams)
+
+     level = tParams["LEVEL"]
+	time = tParams["TIME"]
+
+     dbg("Ramping to "..level.." over "..time.."ms")
 	
-     print("Variables added...")
-	C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=true})
-	print("Driver online...")
+	WLED.SetLevel(level,time)
+	
 end
 
+function RFP.BUTTON_ACTION(tParams)
 
-function ReceivedFromProxy(idBinding, strCommand, tParams)
+     buttonId = tonumber(tParams["BUTTON_ID"])
+	buttonAction = tonumber(tParams["ACTION"])
+	
+	--dbg("button id: "..buttonId)
+	--dbg("button action: "..buttonAction)
 
-  if (strCommand == "ON") then
-    powerCmd("on")
-  end
-  if (strCommand == "OFF") then
-    powerCmd("off")
-  end
-  if (strCommand == "TOGGLE") then
-    if (dimmer == "0") then
-	       powerCmd("on")
-	     else
-		  powerCmd("off")
-    end
-  end
+     if (buttonId == 0) then -- Top
+	
+	   if (buttonAction == 1) then -- Press
+		  WLED.Power("on")
+	   
+	   elseif (buttonAction == 0) then -- Release
 
-    if (strCommand == "PUSH_SCENE") then
-            for k,v in pairs(tParams) do
-                print(k .. ": " .. v)
-            end
-            local sceneNum = tParams["SCENE_ID"]
-            local elements = tParams["ELEMENTS"]
-            local flash = tParams["FLASH"]
-            print("scene_id" .. sceneNum)
-            print("elements: " .. tParams["ELEMENTS"])
-            local elementTable = collect(elements)
-
-            local scene = {}
-
-            for i=1,#elementTable do
-                local t = {}
-                t["Delay"] = elementTable[i][1][1]
-                t["Rate"] = elementTable[i][2][1]
-                t["Level"] = elementTable[i][3][1]
-                table.insert(scene,t)
-            end
-                sceneCollection[sceneNum] = scene
-
-                flashCollection[sceneNum] = flash
-
-                PersistData["sceneCollection"] = sceneCollection
-                PersistData["flashCollection"] = flashCollection
-        elseif (strCommand == "REMOVE_SCENE") then
-            local sceneNum = tParams["SCENE_ID"]
-            print("scene_id: " .. sceneNum)
-
-            sceneCollection[sceneNum] = nil
-
-            flashCollection[sceneNum] = nil
-
-            PersistData["sceneCollection"] = sceneCollection
-            PersistData["flashCollection"] = flashCollection
-
-        elseif (strCommand == "ACTIVATE_SCENE") then
-            local sceneNum = tParams["SCENE_ID"]
-		  --rPrint(tParams, 1000, "ACTIVATE_SCENE")
-            --for k,v in pairs(tParams) do
-            --    dbg(k .. ": " .. v)
-            --end
-            currentScene = sceneNum
-            elementCounter = 0
-            playScene()
-  end
-  
-  if (strCommand == "GET_CONNECTED_STATE") then
-    C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=true})
-    return
-  end
-  
-  if (strCommand == "SET_LEVEL") then
-    print("Light level changed...")
-    dimmer = tParams["LEVEL"]
-    SetColor = Properties["Default Color"]
-    SetColor1 = {}
-    local counter = 0
-    for i in SetColor:gmatch('[^,%s]+') do
-	   counter = counter + 1
-	   SetColor1[counter] = i
-    end
-
-    SetColorR = SetColor1[1]
-    SetColorG = SetColor1[2]
-    SetColorB = SetColor1[3]
-    
-    C4:SetVariable("DIMMER_LEVEL", (dimmer*255)/100)
-    C4:SetVariable("RED_LEVEL", SetColorR)
-    C4:SetVariable("GREEN_LEVEL", SetColorG)
-    C4:SetVariable("BLUE_LEVEL", SetColorB)
-    C4:SetVariable("WHITE_LEVEL", Properties["Default White Value"])
-    C4:SetVariable("EFFECT", Properties["Default Effect"])
-    setColor()
-  end
-  
-  if (strCommand == "RAMP_TO_LEVEL") then
-    rampState = true
-    dimmer = tParams["LEVEL"]
-    rampRate = tonumber(tParams["TIME"])
-    SetColor = Properties["Default Color"]
-    SetColor1 = {}
-    local counter = 0
-    for i in SetColor:gmatch('[^,%s]+') do
-	   counter = counter + 1
-	   SetColor1[counter] = i
-    end
-    
-    print("Light level changed, ramping to "..dimmer.." over the course of "..rampRate.." milliseconds...")
-    
-    if (rampRate > 65000) then
-	   print("Ramp rate reached max. Capping at 65,000ms")
-	   rampRate = 65000
-    end
-
-    SetColorR = SetColor1[1]
-    SetColorG = SetColor1[2]
-    SetColorB = SetColor1[3]
-
-    C4:SetVariable("DIMMER_LEVEL", (dimmer*255)/100)
-    C4:SetVariable("RED_LEVEL", SetColorR)
-    C4:SetVariable("GREEN_LEVEL", SetColorG)
-    C4:SetVariable("BLUE_LEVEL", SetColorB)
-    C4:SetVariable("WHITE_LEVEL", Properties["Default White Value"])
-    C4:SetVariable("EFFECT", Properties["Default Effect"])
-    setColor()
-  end
-  
-  if (strCommand == "BUTTON_ACTION") then
-    local action = tParams["ACTION"]
-    local id = tParams["BUTTON_ID"]
-    print("Button action: "..action)
-    print("Button ID: "..id)
-    
-      if (id == "0") then
-	   if (action == "2") then
-	     powerCmd("on")
 	   end
-	 end
-	 if (id == "1") then
-	   if (action == "2") then
-	     powerCmd("off")
+	   
+	
+	elseif (buttonId == 1) then -- Bottom
+	
+	   if (buttonAction == 1) then -- Press
+	   
+		  WLED.Power("off")
+	   
+	   elseif (buttonAction == 0) then -- Release
+	   
 	   end
-	 end
-	 if (id == "2") then
-	   if (action == "2") then
-	     if (dimmer == "0") then
-	       powerCmd("on")
-	     else
-		  powerCmd("off")
-	     end
+	
+	elseif (buttonId == 2) then -- Toggle
+	
+	   if (buttonAction == 1) then -- Press
+	   
+		  WLED.Power("toggle")
+	   
+	   elseif (buttonAction == 0) then -- Release
+	   
 	   end
-	 end
-  end
-  
-  
-  print("Proxy command: "..strCommand)
-  for k,v in pairs(tParams) do
-	   print(k .. ": " .. v)
-  end
-
-  
--- The rest of your ReceivedFromProxy code goes here...
+	
+	end
 
 end
 
-function powerCmd(cmd)
+function RFP.SET_PRESET_LEVEL(tParams)
 
-ipAddr1 = Properties["IP Address 1"]
-ipAddr2 = Properties["IP Address 2"]
-ipAddr3 = Properties["IP Address 3"]
-ipAddr4 = Properties["IP Address 4"]
-ipAddr5 = Properties["IP Address 5"]
-
-print("Setting Dimmer Command: "..cmd)
-
-rampState = false
-
-if (cmd == "off") then
-    dimmerVal = "0"
-end    
-
-if (cmd == "on") then
-
-    print("Light level changed...")
-    
-    rampRate = 500
-    
-    SetColor = Properties["Default Color"]
-    SetColor1 = {}
-    local counter = 0
-    for i in SetColor:gmatch('[^,%s]+') do
-	   counter = counter + 1
-	   SetColor1[counter] = i
-    end
-
-    SetColorR = SetColor1[1]
-    SetColorG = SetColor1[2]
-    SetColorB = SetColor1[3]
-
-    C4:SetVariable("DIMMER_LEVEL", "255")
-    C4:SetVariable("RED_LEVEL", SetColorR)
-    C4:SetVariable("GREEN_LEVEL", SetColorG)
-    C4:SetVariable("BLUE_LEVEL", SetColorB)
-    C4:SetVariable("WHITE_LEVEL", Properties["Default White Value"])
-    C4:SetVariable("EFFECT", Properties["Default Effect"])
-
-    dimmerVal = "255"
-end
-
-dimmer =  Variables["DIMMER_LEVEL"]
-
-dimmer100 = (dimmer*100)/255
-C4:SendToProxy(5001, "LIGHT_LEVEL", dimmer100)
-
-urlCall1 = ipAddr1.."/win&T="..dimmerVal.."&TT="..rampRate
-urlCall2 = ipAddr2.."/win&T="..dimmerVal.."&TT="..rampRate
-urlCall3 = ipAddr3.."/win&T="..dimmerVal.."&TT="..rampRate
-urlCall4 = ipAddr4.."/win&T="..dimmerVal.."&TT="..rampRate
-urlCall5 = ipAddr5.."/win&T="..dimmerVal.."&TT="..rampRate
-
-C4:urlGet(urlCall1, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
-
-C4:urlGet(urlCall2, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
-
-C4:urlGet(urlCall3, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
-
-C4:urlGet(urlCall4, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
-
-C4:urlGet(urlCall5, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
-
-C4:SetVariable("DIMMER_LEVEL", "0")
+     PersistData["PRESET_LEVEL"] = tParams["LEVEL"]
 
 end
 
-function setColor()
+function RFP.SET_CLICK_RATE_UP(tParams)
 
-ipAddr1 = Properties["IP Address 1"]
-ipAddr2 = Properties["IP Address 2"]
-ipAddr3 = Properties["IP Address 3"]
-ipAddr4 = Properties["IP Address 4"]
-ipAddr5 = Properties["IP Address 5"]
-red =  Variables["RED_LEVEL"]
-green =  Variables["GREEN_LEVEL"]
-blue =  Variables["BLUE_LEVEL"]
-white =  Variables["WHITE_LEVEL"]
-effect = Variables["EFFECT"]
-dimmer =  Variables["DIMMER_LEVEL"]
-
-
-if (dimmer == "0") then
-
-  print("Dimmer is 0, handing to power function")
-  powerCmd("off")
-  return
-  
-end
-
-rampState = false
-
-dimmer100 = (dimmer*100)/255
-
-C4:SendToProxy(5001, "LIGHT_LEVEL", dimmer100)
-
-print("Sent to proxy: "..dimmer100)
-
-print("Setting Color: ".."d: "..dimmer.." RGB: "..red..","..green..","..blue..","..white)
-
-urlCall1 = ipAddr1.."/win&A="..dimmer.."&R="..red.."&G="..green.."&B="..blue.."&W="..white.."&FX="..effect.."&TT="..rampRate
-urlCall2 = ipAddr2.."/win&A="..dimmer.."&R="..red.."&G="..green.."&B="..blue.."&W="..white.."&FX="..effect.."&TT="..rampRate
-urlCall3 = ipAddr3.."/win&A="..dimmer.."&R="..red.."&G="..green.."&B="..blue.."&W="..white.."&FX="..effect.."&TT="..rampRate
-urlCall4 = ipAddr4.."/win&A="..dimmer.."&R="..red.."&G="..green.."&B="..blue.."&W="..white.."&FX="..effect.."&TT="..rampRate
-urlCall5 = ipAddr5.."/win&A="..dimmer.."&R="..red.."&G="..green.."&B="..blue.."&W="..white.."&FX="..effect.."&TT="..rampRate
-
-
-
-C4:urlGet(urlCall1, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
-
-C4:urlGet(urlCall2, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
-
-C4:urlGet(urlCall3, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
-
-C4:urlGet(urlCall4, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
-
-C4:urlGet(urlCall5, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
-
-C4:SetVariable("DIMMER_LEVEL", "0")
-C4:SetVariable("RED_LEVEL", "0")
-C4:SetVariable("GREEN_LEVEL", "0")
-C4:SetVariable("BLUE_LEVEL", "0")
-C4:SetVariable("WHITE_LEVEL", "0")
+     PersistData["CLICK_RATE_UP"] = tParams["RATE"]
 
 end
 
-function setPreset(id)
-ipAddr1 = Properties["IP Address 1"]
-ipAddr2 = Properties["IP Address 2"]
-ipAddr3 = Properties["IP Address 3"]
-ipAddr4 = Properties["IP Address 4"]
-ipAddr5 = Properties["IP Address 5"]
+function RFP.SET_CLICK_RATE_DOWN(tParams)
 
-urlCall1 = ipAddr1.."/win&PL="..id
-urlCall2 = ipAddr2.."/win&PL="..id
-urlCall3 = ipAddr3.."/win&PL="..id
-urlCall4 = ipAddr4.."/win&PL="..id
-urlCall5 = ipAddr5.."/win&PL="..id
-
-print("Preset URL: "..urlCall1)
-
-C4:urlGet(urlCall1, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
-
-C4:urlGet(urlCall2, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
-
-C4:urlGet(urlCall3, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
-
-C4:urlGet(urlCall4, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
-
-C4:urlGet(urlCall5, {}, false,
-    function(ticketId, strData, responseCode, tHeaders, strError)
-	   if (strError == nil) then
-		  print("URL Call succeeded")
-	   else
-		  print("C4:urlGet() failed: " .. strError)
-	   end
-    end
-)
+     PersistData["CLICK_RATE_DOWN"] = tParams["RATE"]
 
 end
 
-function OnVariableChanged(strName)
-print(strName.." variable updated, new value "..Variables[strName])
-if (Variables["UPDATE"] == "1") then
-    print("update true")
-    setColor()
-    C4:SetVariable("UPDATE", "0")
-    print("update set back to false")
-end
+function RFP.SET_COLOR_TARGET(tParams)
+
+     WLED.SetColor(tParams)
+
 end
 
+function RFP.PUSH_SCENE(tParams)
 
-function ExecuteCommand(strCommand, tParams)
---print("ExecuteCommand function called with : " .. strCommand)
- if (tParams == nil) then
-   if (strCommand =="GET_PROPERTIES") then
-     GET_PROPERTIES()
-   else
-     --print ("From ExecuteCommand Function - Unutilized command: " .. strCommand)
-   end
- end
- 
- if (strCommand == "Set Color") then
-    print("Set Color Command...")
-    
-    SetColor = tParams["RGB"]
-    SetColor1 = {}
-    local counter = 0
-    for i in SetColor:gmatch('[^,%s]+') do
-	   counter = counter + 1
-	   SetColor1[counter] = i
-    end
+     SceneID = tonumber(tParams["SCENE_ID"])
 
-    SetColorR = SetColor1[1]
-    SetColorG = SetColor1[2]
-    SetColorB = SetColor1[3]
-    SetWhite = tParams["White"]
-    SetDimmer = tParams["Dimmer"]
-    
-    print("R: "..SetColorR.." G: "..SetColorG.." B: "..SetColorB.." White: "..SetWhite.." Dimmer: "..SetDimmer)
-    
-    C4:SetVariable("DIMMER_LEVEL", SetDimmer)
-    C4:SetVariable("RED_LEVEL", SetColorR)
-    C4:SetVariable("GREEN_LEVEL", SetColorG)
-    C4:SetVariable("BLUE_LEVEL", SetColorB)
-    C4:SetVariable("WHITE_LEVEL", SetWhite)
-    
-    setColor()
-    
- end
- 
- if (strCommand == "Set Effect") then
-    print("Set effect...")
-    C4:SetVariable("EFFECT", tParams["Effect Index"])
-    C4:SetVariable("DIMMER_LEVEL", "255")
-    print("Effect: "..tParams["Effect Index"])
-    setColor()
- end
- 
- if (strCommand == "Set Preset") then
-    print("Setting preset"..tParams["Preset ID"].."...")
-    setPreset(tParams["Preset ID"])
- end
- 
- if (strCommand == "LUA_ACTION") then
-   if tParams ~= nil then
-     for cmd,cmdv in pairs(tParams) do 
-       --print (cmd,cmdv)
-       if cmd == "ACTION" then
-         if cmdv == "helloworld" then
-	      C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=true})
-           print("Hello world, online")
-	    elseif cmdv == "fullwhite" then
-	      setColor()
-         else
-           --print("From ExecuteCommand Function - Undefined Action")
-           --print("Key: " .. cmd .. "  Value: " .. cmdv)
-         end
-       else
-         --print("From ExecuteCommand Function - Undefined Command")
-         --print("Key: " .. cmd .. "  Value: " .. cmdv)
-       end
+     PersistData["Scenes"][SceneID] = tParams
+
+end
+
+function RFP.ACTIVATE_SCENE(tParams)
+
+     SceneID = tParams["SCENE_ID"]
+
+     elements = PersistData["Scenes"][tonumber(SceneID)]["ELEMENTS"]
+	elements = C4:ParseXml(elements)
+	
+	data = {}
+	
+	for k,v in pairs(elements.ChildNodes) do
+
+	    data[v["Name"]] = v["Value"]
+
      end
-   end
- end
-end
-
-function playScene()
-    print("Playing Scene...")
-    if (elementCounter ~= 0) then
-        local t = {}
-        dimmer = sceneCollection[tostring(currentScene)][elementCounter]["Level"]
-        rampRate = tonumber(sceneCollection[tostring(currentScene)][elementCounter]["Rate"])
-        rampState = true
-	   SetColor = Properties["Default Color"]
-	   SetColor1 = {}
-	   local counter = 0
-	   for i in SetColor:gmatch('[^,%s]+') do
-		  counter = counter + 1
-		  SetColor1[counter] = i
-	   end
+	
+	if (data["brightnessEnabled"] == "True") then
+	 
+	   dbg("Brightness mode enabled")
 	   
-	   print("Light level changed, ramping to "..dimmer.." over the course of "..rampRate.." milliseconds...")
+	   WLED.SetLevel(data["brightness"],data["brightnessRate"])
+
+     end
+	
+     if (data["colorEnabled"] == "True") then
+	
+	   dbg("Color mode enabled")
+	   colorData = {}
+	   colorData["LIGHT_COLOR_TARGET_X"] = data["colorX"]
+	   colorData["LIGHT_COLOR_TARGET_Y"] = data["colorY"]
+	   colorData["LIGHT_COLOR_TARGET_MODE"] = data["colorMode"]
+	   colorData["RATE"] = data["colorRate"]
 	   
-	   if (rampRate > 65000) then
-		  print("Ramp rate reached max. Capping at 65,000ms")
-		  rampRate = 65000
+	   WLED.SetColor(colorData)
+	
+     end
+
+end
+
+function ExecuteCommand (strCommand, tParams)
+	tParams = tParams or {}
+    if (DEBUGPRINT) then
+        local output = {"--- ExecuteCommand", strCommand, "----PARAMS----"}
+        for k, v in pairs(tParams) do
+            table.insert(output, tostring(k).." = "..tostring(v))
+        end
+        table.insert(output, "---")
+        print (table.concat(output, "\r\n"))
+    end
+    if (strCommand == "LUA_ACTION") then
+        if (tParams.ACTION) then
+            strCommand = tParams.ACTION
+            tParams.ACTION = nil
+        end
+    end
+    local success, ret
+    strCommand = string.gsub(strCommand, "%s+", "_")
+    if (EC and EC[strCommand] and type(EC[strCommand]) == "function") then
+        success, ret = pcall(EC[strCommand], tParams)
+    end
+    if (success == true) then
+        return (ret)
+    elseif (success == false) then
+        print ("ExecuteCommand Lua error: ", strCommand, ret)
+    end
+end
+
+function EC.refresh_device()
+     dbg("Refreshing Device")
+     WLED.GetDeviceInfo()
+end
+
+function OnPropertyChanged (strProperty)
+	local value = Properties [strProperty]
+	if (value == nil) then
+		value = ''
+	end
+	if (DEBUGPRINT) then
+		local output = {"--- OnPropertyChanged: "..strProperty, value}
+		print (output)
+	end
+	local success, ret
+	strProperty = string.gsub (strProperty, '%s+', '_')
+	if (OPC and OPC [strProperty] and type (OPC [strProperty]) == 'function') then
+		success, ret = pcall (OPC [strProperty], value)
+	end
+	if (success == true) then
+		return (ret)
+	elseif (success == false) then
+		print ('OnPropertyChanged Lua error: ', strProperty, ret)
+	end
+end
+
+function OPC.Debug_Mode (value)
+	if (DEBUGPRINT) then
+		DEBUGPRINT = false
+	end
+	if (value == 'On') then
+		DEBUGPRINT = true
+	end
+end
+
+function OPC.Primary_Host_Address(value)
+     dbg("Host address changed to "..value)
+	WLED.GetDeviceInfo()
+
+end
+
+function WLED.GetURL(uri,source)
+
+     baseUrl = Properties["Primary Host Address"]
+	url = baseUrl..uri
+	
+	dbg ("---Get URL---")
+	dbg ("URL: "..url)
+	C4:urlGet(url, {}, false,
+		function(ticketId, strData, responseCode, tHeaders, strError)
+			if (strError == nil) then
+				strData = strData or ''
+				responseCode = responseCode or 0
+				tHeaders = tHeaders or {}
+				if (responseCode == 0) then
+					print("FAILED retrieving: "..url.." Error: "..strError)
+				end
+				if (strData == "") then
+					print("FAILED -- No Data returned")
+				end
+				if (responseCode == 200) then
+					dbg ("SUCCESS retrieving: "..url.." Response: "..strData)
+					
+					if (source == "GetDeviceInfo") then
+					   WLED.PopulateDeviceInfo(strData)
+				     end
+					
+					
+					
+				end
+			else
+				print("C4:urlGet() failed: "..strError)
+			end
+		end
+	)
+
+end
+
+function WLED.PostURL(uri,data,source)
+
+     baseUrl = Properties["Primary Host Address"]
+	url = baseUrl..uri
+
+	
+	dbg ("---Get URL---")
+	dbg ("URL: "..url)
+	dbg ("Posting data: "..data)
+	C4:urlPost(url, data, {["Content-Type"] = "text/json"})
+	
+	function ReceivedAsync(ticketId, strData, responseCode, tHeaders, strError)
+			if (strError == nil) then
+				strData = strData or ''
+				responseCode = responseCode or 0
+				tHeaders = tHeaders or {}
+				if (responseCode == 0) then
+					print("FAILED retrieving: "..url.." Error: "..strError)
+				end
+				if (strData == "") then
+					print("FAILED -- No Data returned")
+				end
+				if (responseCode == 200) then
+					dbg ("SUCCESS retrieving: "..url.." Response: "..strData)
+					
+					if (source == "GetDeviceInfo") then
+					   WLED.PopulateDeviceInfo(strData)
+				     end
+					
+					
+					
+				end
+			else
+				print("C4:urlPost() failed: "..strError)
+			end
+     end
+
+end
+
+function WLED.GetDeviceInfo()
+     WLED.GetURL("/json/info","GetDeviceInfo")
+end
+
+function WLED.PopulateDeviceInfo(response)
+    
+    data = JSON:decode(response)
+    
+    C4:UpdateProperty("Name", data["name"])
+    C4:UpdateProperty("WLED Version", data["ver"])
+    C4:UpdateProperty("Chip Type", data["arch"])
+    
+    C4:RenameDevice(ProxyID, data["name"])
+    
+    C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=true})
+
+end
+
+function WLED.SetLevel(level,time)
+
+     scaledLevel = ConversionScale(level)
+	currentLevel = C4:GetVariable(ProxyID, 1001)
+	
+	SetStr = "/win&A="..scaledLevel.."&TT="..time
+	
+	WLED.GetURL(SetStr,"SetLevel")
+	
+	dataToSend = {
+	    LIGHT_BRIGHTNESS_CURRENT = currentLevel,
+	    LIGHT_BRIGHTNESS_TARGET = level,
+	    RATE = time
+     }
+	
+	dbg("Setting level to "..level.." over "..time.."ms")
+	
+	C4:SendToProxy(5001,"LIGHT_BRIGHTNESS_CHANGING",dataToSend)
+
+end
+
+function WLED.Power(state)
+
+     dbg("Setting WLED power to "..state)
+
+     currentState = tonumber(C4:GetVariable(ProxyID, 1000))
+	
+     rateUp = PersistData["CLICK_RATE_UP"]
+	rateDown = PersistData["CLICK_RATE_DOWN"]
+	--rateHold = C4:GetVariable(ProxyID, 1004)
+	
+	defaultLevel = C4:GetVariable(ProxyID, 1006)
+
+     if (state == "on") then
+	   WLED.SetLevel(defaultLevel,rateUp)
+	elseif (state == "off") then
+	   WLED.SetLevel(0,rateDown)
+	elseif (state == "toggle") then
+	    dbg("Current state: "..currentState)
+	   if (currentState ~= 0) then
+		  WLED.SetLevel(0,rateDown)
+	   else
+		  WLED.SetLevel(defaultLevel,rateUp)
 	   end
+	end
 
-	   SetColorR = SetColor1[1]
-	   SetColorG = SetColor1[2]
-	   SetColorB = SetColor1[3]
 
-	   C4:SetVariable("DIMMER_LEVEL", (dimmer*255)/100)
-	   C4:SetVariable("RED_LEVEL", SetColorR)
-	   C4:SetVariable("GREEN_LEVEL", SetColorG)
-	   C4:SetVariable("BLUE_LEVEL", SetColorB)
-	   C4:SetVariable("WHITE_LEVEL", Properties["Default White Value"])
-	   C4:SetVariable("EFFECT", Properties["Default Effect"])
-	   setColor()
-    end
-    elementCounter = elementCounter + 1
-    print(elementCounter)
-
-    if (elementCounter > #sceneCollection[tostring(currentScene)] and flashCollection[tostring(currentScene)] == "1") then
-        elementCounter = 1
-    end
-
-    if (elementCounter <= #sceneCollection[tostring(currentScene)]) then
-        local timeInterval = sceneCollection[tostring(currentScene)][elementCounter]["Delay"] or -1
-        executeElementTimer = C4:KillTimer(executeElementTimer)
-        executeElementTimer = C4:AddTimer(timeInterval, "MILLISECONDS")
-    else
-        print("end of scene")
-    end
 end
 
-function collect(s)
-  local stack = {}
-  local top = {}
-  table.insert(stack, top)
-  local ni,c,label,xarg, empty
-  local i, j = 1, 1
-  while true do
-    ni,j,c,label,xarg, empty = string.find(s, "<(%/?)([%w:]+)(.-)(%/?)>", i)
-    if not ni then break end
-    local text = string.sub(s, i, ni-1)
-    if not string.find(text, "^%s*$") then
-      table.insert(top, text)
-    end
-    if empty == "/" then  -- empty element tag
-      table.insert(top, {label=label, xarg=parseargs(xarg), empty=1})
-    elseif c == "" then   -- start tag
-      top = {label=label, xarg=parseargs(xarg)}
-      table.insert(stack, top)   -- new level
-    else  -- end tag
-      local toclose = table.remove(stack)  -- remove top
-      top = stack[#stack]
-      if #stack < 1 then
-        print("nothing to close with "..label)
-      end
-      if toclose.label ~= label then
-        print("trying to close "..toclose.label.." with "..label)
-      end
-      table.insert(top, toclose)
-    end
-    i = j+1
-  end
-  local text = string.sub(s, i)
-  if not string.find(text, "^%s*$") then
-    table.insert(stack[#stack], text)
-  end
-  if #stack > 1 then
-    print("unclosed "..stack[#stack].label)
-  end
-  return stack[1]
-end
+function WLED.SetColor(tParams)
+	
+	x = tParams["LIGHT_COLOR_TARGET_X"]
+	y = tParams["LIGHT_COLOR_TARGET_Y"]
+	
+	mode = tonumber(tParams["LIGHT_COLOR_TARGET_MODE"])
+	rate = tParams["RATE"]
+	
+	currentLevel = C4:GetVariable(ProxyID, 1001)
+	
+	
+	if (mode == 0) then
+	
+	    r,g,b = C4:ColorXYtoRGB (x, y)
+	    
+	    SetStr = "/win&R="..r.."&G="..g.."&B="..b.."&TT="..rate
+	    
+	    dbg("Setting color to "..r..","..g..","..b.." over "..rate.."ms")
+	
+     else
+	    k = C4:ColorXYtoCCT (x, y)
+	    
+	    SetStr = "/win&LY="..k.."&TT="..rate
+	    
+	    dbg("Setting temperature to "..k.." over "..rate.."ms")
+	    
+     end
+	
+	WLED.GetURL(SetStr,"SetColor")
+	
+	dataToSend = {
 
-function parseargs(s)
-  local arg = {}
-  string.gsub(s, "(%w+)=([\"'])(.-)%2", function (w, _, a)
-    arg[w] = a
-  end)
-  return arg
-end
+	   LIGHT_COLOR_CURRENT_X = x,
+	   LIGHT_COLOR_CURRENT_Y = y,
+	   LIGHT_COLOR_CURRENT_COLOR_MODE = mode
 
-function OnTimerExpired(idTimer)
-    if (idTimer == g_DebugTimer) then
-        print("Turning Debug Mode Off (timer expired)")
-        C4:UpdateProperty("Debug Mode", "Off")
-    elseif (idTimer == executeElementTimer) then
-        playScene()
-    end
-    --C4:KillTimer(idTimer)
+    }
+
+	
+	C4:SendToProxy(5001,"LIGHT_COLOR_CHANGED",dataToSend)
+
 end
