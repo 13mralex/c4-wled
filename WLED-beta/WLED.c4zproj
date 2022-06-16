@@ -1,0 +1,6 @@
+﻿<Driver type="c4z" name="WLED">
+ <Items>
+  <Item type="file" name="driver.xml" />
+  <Item type="file" name="script.lua" />
+ </Items>
+</Driver>
