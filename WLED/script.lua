@@ -8,6 +8,9 @@ do	--Globals
 	WLED = {}
 	DeviceID = nil
 	PersistData["Scenes"] = PersistData["Scenes"] or {}
+	DeviceProperty = "Device Address "
+	MaxDevices = 10
+	NumDevices = tonumber(Properties["Number of Additional Devices"])
 end
 
 function dbg (strDebugText, ...)
@@ -23,6 +26,9 @@ function OnDriverInit()
      --C4:AddVariable("PRESET_LEVEL",0,"NUMBER",false,true)
 	--C4:AddVariable("CLICK_RATE_UP",0,"NUMBER",false,true)
 	--C4:AddVariable("CLICK_RATE_DOWN",0,"NUMBER",false,true)
+	
+	UpdateAdditionalDevices()
+	
 
 end
 
@@ -43,6 +49,26 @@ function ConversionScale(level)
      level = (level/100)*255
      level = math.floor(level)
 	return level
+
+end
+
+function UpdateAdditionalDevices()
+
+     NumDevices = tonumber(Properties["Number of Additional Devices"])
+
+	for i = 1,MaxDevices,1 do
+
+	    if (i <= NumDevices) then
+	    
+		   C4:SetPropertyAttribs(DeviceProperty..i, 0)
+	    
+	    else
+	    
+		   C4:SetPropertyAttribs(DeviceProperty..i, 1)
+	    
+	    end
+
+     end
 
 end
 
@@ -83,6 +109,17 @@ function RFP.RAMP_TO_LEVEL(tParams)
 	time = tParams["TIME"]
 
      dbg("Ramping to "..level.." over "..time.."ms")
+	
+	WLED.SetLevel(level,time)
+	
+end
+
+function RFP.SET_LEVEL(tParams)
+
+     level = tParams["LEVEL"] or 0
+	time = tParams["TIME"]
+
+     dbg("Setting level to "..level.." over "..time.."ms")
 	
 	WLED.SetLevel(level,time)
 	
@@ -247,6 +284,9 @@ function OnPropertyChanged (strProperty)
 	if (OPC and OPC [strProperty] and type (OPC [strProperty]) == 'function') then
 		success, ret = pcall (OPC [strProperty], value)
 	end
+	
+	dbg("Property "..strProperty.." changed to "..value)
+	
 	if (success == true) then
 		return (ret)
 	elseif (success == false) then
@@ -263,52 +303,73 @@ function OPC.Debug_Mode (value)
 	end
 end
 
-function OPC.Primary_Host_Address(value)
-     dbg("Host address changed to "..value)
+function OPC.Primary_Device_Address(value)
+     dbg("Device address changed to "..value)
 	WLED.GetDeviceInfo()
+
+end
+
+function OPC.Number_of_Additional_Devices(value)
+
+     UpdateAdditionalDevices()
 
 end
 
 function WLED.GetURL(uri,source)
 
-     baseUrl = Properties["Primary Host Address"]
-	url = baseUrl..uri
+     urls = {}
 	
-	dbg ("---Get URL---")
-	dbg ("URL: "..url)
-	C4:urlGet(url, {}, false,
-		function(ticketId, strData, responseCode, tHeaders, strError)
-			if (strError == nil) then
-				strData = strData or ''
-				responseCode = responseCode or 0
-				tHeaders = tHeaders or {}
-				if (responseCode == 0) then
-					print("FAILED retrieving: "..url.." Error: "..strError)
-				end
-				if (strData == "") then
-					print("FAILED -- No Data returned")
-				end
-				if (responseCode == 200) then
-					dbg ("SUCCESS retrieving: "..url.." Response: "..strData)
-					
-					if (source == "GetDeviceInfo") then
-					   WLED.PopulateDeviceInfo(strData)
-				     end
-					
-					
-					
-				end
-			else
-				print("C4:urlGet() failed: "..strError)
-			end
-		end
-	)
+	table.insert(urls,Properties["Primary Device Address"]..uri)
+
+	if (source ~= "GetDeviceInfo") then -- Only update primary device values
+	
+	    for i = 1,NumDevices,1 do
+
+		  url = Properties[DeviceProperty..i]..uri
+		  
+		  table.insert(urls,url)
+
+	    end
+     end
+
+	
+	for i,url in pairs(urls) do
+	
+	    dbg ("---Get URL---")
+	    dbg ("URL: "..url)
+	    C4:urlGet(url, {}, false,
+		    function(ticketId, strData, responseCode, tHeaders, strError)
+			    if (strError == nil) then
+				    strData = strData or ''
+				    responseCode = responseCode or 0
+				    tHeaders = tHeaders or {}
+				    if (responseCode == 0) then
+					    print("FAILED retrieving: "..url.." Error: "..strError)
+				    end
+				    if (strData == "") then
+					    print("FAILED -- No Data returned")
+				    end
+				    if (responseCode == 200) then
+					    dbg ("SUCCESS retrieving: "..url.." Response: "..strData)
+					    
+					    if (source == "GetDeviceInfo") then
+						  WLED.PopulateDeviceInfo(strData)
+					    end
+					    
+				    end
+			    else
+				    print("C4:urlGet() failed: "..strError)
+			    end
+		    end
+	    )
+	
+	end
 
 end
 
 function WLED.PostURL(uri,data,source)
 
-     baseUrl = Properties["Primary Host Address"]
+     baseUrl = Properties["Primary Device Address"]
 	url = baseUrl..uri
 
 	
