@@ -54,6 +54,12 @@
         <readonly>true</readonly>
       </property>
       <property>
+        <name>Websocket State</name>
+        <type>STRING</type>
+        <default></default>
+        <readonly>true</readonly>
+      </property>
+	  <property>
         <name>Auto Name Driver</name>
         <type>LIST</type>
         <default>On</default>
@@ -62,73 +68,73 @@
           <item>On</item>
         </items>
       </property>
-	  <property>
+      <property>
         <name>Additional Devices</name>
         <type>LABEL</type>
         <default>Additional Devices</default>
       </property>
-	  <property>
+      <property>
         <name>Number of Additional Devices</name>
         <type>RANGED_INTEGER</type>
         <default>0</default>
         <minimum>0</minimum>
         <maximum>10</maximum>
       </property>
-	  <property>
+      <property>
         <name>Device Address 1</name>
         <type>STRING</type>
         <default></default>
         <readonly>false</readonly>
       </property>
-	  <property>
+      <property>
         <name>Device Address 2</name>
         <type>STRING</type>
         <default></default>
         <readonly>false</readonly>
       </property>
-	  <property>
+      <property>
         <name>Device Address 3</name>
         <type>STRING</type>
         <default></default>
         <readonly>false</readonly>
       </property>
-	  <property>
+      <property>
         <name>Device Address 4</name>
         <type>STRING</type>
         <default></default>
         <readonly>false</readonly>
       </property>
-	  <property>
+      <property>
         <name>Device Address 5</name>
         <type>STRING</type>
         <default></default>
         <readonly>false</readonly>
       </property>
-	  <property>
+      <property>
         <name>Device Address 6</name>
         <type>STRING</type>
         <default></default>
         <readonly>false</readonly>
       </property>
-	  <property>
+      <property>
         <name>Device Address 7</name>
         <type>STRING</type>
         <default></default>
         <readonly>false</readonly>
       </property>
-	  <property>
+      <property>
         <name>Device Address 8</name>
         <type>STRING</type>
         <default></default>
         <readonly>false</readonly>
       </property>
-	  <property>
+      <property>
         <name>Device Address 9</name>
         <type>STRING</type>
         <default></default>
         <readonly>false</readonly>
       </property>
-	  <property>
+      <property>
         <name>Device Address 10</name>
         <type>STRING</type>
         <default></default>
@@ -136,8 +142,12 @@
       </property>
     </properties>
     <actions>
+	  <action>
+        <name>Reboot Device(s)</name>
+        <command>reboot_devices</command>
+      </action>
       <action>
-        <name>Refresh Device</name>
+        <name>Refresh Primary Device</name>
         <command>refresh_device</command>
       </action>
     </actions>
@@ -179,11 +189,11 @@
     <hold_rate>False</hold_rate>
     <click_rates>True</click_rates>
     <supports_color>True</supports_color>
-	<has_extras>True</has_extras>
-    <color_rate_behavior>2</color_rate_behavior>
-	<color_rate_min>0-</color_rate_min>
-	<color_rate_max>65000</color_rate_max>
-	<supports_color_correlated_temperature>True</supports_color_correlated_temperature>
+    <has_extras>True</has_extras>
+    <color_rate_behavior>1</color_rate_behavior>
+    <color_rate_min>0-</color_rate_min>
+    <color_rate_max>65000</color_rate_max>
+    <supports_color_correlated_temperature>True</supports_color_correlated_temperature>
     <color_correlated_temperature_min>2700</color_correlated_temperature_min>
     <color_correlated_temperature_max>6500</color_correlated_temperature_max>
   </capabilities>

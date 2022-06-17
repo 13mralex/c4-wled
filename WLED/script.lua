@@ -1,5 +1,5 @@
-require "json"
-JSON=(loadstring(json.JSON_LIBRARY_CHUNK))()
+JSON = require ('drivers-common-public.module.json')
+WebSocket = require ('drivers-common-public.module.websocket')
 
 do	--Globals
 	OPC = OPC or {}
@@ -27,7 +27,10 @@ function OnDriverInit()
 	--C4:AddVariable("CLICK_RATE_UP",0,"NUMBER",false,true)
 	--C4:AddVariable("CLICK_RATE_DOWN",0,"NUMBER",false,true)
 	
+	C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=false})
+	
 	UpdateAdditionalDevices()
+	ConnectWebsocket()
 	
 
 end
@@ -52,6 +55,15 @@ function ConversionScale(level)
 
 end
 
+function ConversionScale100(level)
+
+     level = tonumber(level)
+     level = (level/255)*100
+     level = math.floor(level)
+	return level
+
+end
+
 function UpdateAdditionalDevices()
 
      NumDevices = tonumber(Properties["Number of Additional Devices"])
@@ -69,6 +81,42 @@ function UpdateAdditionalDevices()
 	    end
 
      end
+
+end
+
+function ConnectWebsocket()
+
+     wsURL = "ws://"..Properties["Primary Device Address"].."/ws"
+	
+	--PersistData["WLEDSocket"] = PersistData["WLEDSocket"] or "none"
+	
+     if (PersistData["WLEDSocket"]) then
+		PersistData["WLEDSocket"]:delete ()
+	end
+	PersistData["WLEDSocket"] = WebSocket:new (wsURL)
+
+	local pm = function (self, data)
+		dbg ('WS Message Received: ' .. data)
+		WLED.WSDataReceived(data)
+	end
+
+	PersistData["WLEDSocket"]:SetProcessMessageFunction (pm)
+
+	local est = function (self)
+		dbg ('ws connection established')
+		C4:UpdateProperty("Websocket State", "Connected")
+	end
+
+	PersistData["WLEDSocket"]:SetEstablishedFunction (est)
+
+	local closed = function (self)
+		dbg ('ws connection closed by remote host')
+		C4:UpdateProperty("Websocket State", "Disconnected")
+	end
+
+	PersistData["WLEDSocket"]:SetClosedByRemoteFunction (closed)
+
+	PersistData["WLEDSocket"]:Start ()
 
 end
 
@@ -116,13 +164,21 @@ end
 
 function RFP.SET_LEVEL(tParams)
 
-     level = tParams["LEVEL"] or 0
-	time = tParams["TIME"]
+     level = tParams["LEVEL"] 
+	time = tParams["TIME"] or 0
 
      dbg("Setting level to "..level.." over "..time.."ms")
 	
 	WLED.SetLevel(level,time)
 	
+end
+
+function RFP.ON()
+     WLED.Power("on")
+end
+
+function RFP.OFF()
+     WLED.Power("off")
 end
 
 function RFP.BUTTON_ACTION(tParams)
@@ -268,6 +324,13 @@ end
 function EC.refresh_device()
      dbg("Refreshing Device")
      WLED.GetDeviceInfo()
+	ConnectWebsocket()
+end
+
+function EC.reboot_devices()
+
+     WLED.GetURL("/win&RB","reboot")
+
 end
 
 function OnPropertyChanged (strProperty)
@@ -418,8 +481,22 @@ function WLED.PopulateDeviceInfo(response)
     C4:UpdateProperty("WLED Version", data["ver"])
     C4:UpdateProperty("Chip Type", data["arch"])
     
-    C4:RenameDevice(ProxyID, data["name"])
+    if (Properties["Auto Name Driver"] == "On") then
+	   C4:RenameDevice(ProxyID, data["name"])
+    end
     
+    --DynamicCapabilities = {}
+    
+    --if (data["leds"]["rgbw"] and data["leds"]["wv"]) then
+	--   DynamicCapabilities["supports_color_correlated_temperature"] = true
+    --else
+	--   DynamicCapabilities["supports_color_correlated_temperature"] = false
+    --end
+    
+    
+	    
+	    
+    --C4:SendToProxy(5001, "DYANAMIC_CAPABILITIES_CHANGED", DynamicCapabilities)
     C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=true})
 
 end
@@ -484,7 +561,7 @@ function WLED.SetColor(tParams)
 	currentLevel = C4:GetVariable(ProxyID, 1001)
 	
 	
-	if (mode == 0) then
+	if (mode == 0 or mode == 1) then
 	
 	    r,g,b = C4:ColorXYtoRGB (x, y)
 	    
@@ -492,12 +569,12 @@ function WLED.SetColor(tParams)
 	    
 	    dbg("Setting color to "..r..","..g..","..b.." over "..rate.."ms")
 	
-     else
-	    k = C4:ColorXYtoCCT (x, y)
+     --else
+	--    k = C4:ColorXYtoCCT (x, y)
 	    
-	    SetStr = "/win&LY="..k.."&TT="..rate
+	 --   SetStr = "/win&LY="..k.."&TT="..rate
 	    
-	    dbg("Setting temperature to "..k.." over "..rate.."ms")
+	 --   dbg("Setting temperature to "..k.." over "..rate.."ms")
 	    
      end
 	
@@ -507,11 +584,50 @@ function WLED.SetColor(tParams)
 
 	   LIGHT_COLOR_CURRENT_X = x,
 	   LIGHT_COLOR_CURRENT_Y = y,
-	   LIGHT_COLOR_CURRENT_COLOR_MODE = mode
+	   LIGHT_COLOR_CURRENT_COLOR_MODE = mode,
+	   RATE = rate
 
     }
 
 	
-	C4:SendToProxy(5001,"LIGHT_COLOR_CHANGED",dataToSend)
+	C4:SendToProxy(5001,"LIGHT_COLOR_CHANGING",dataToSend)
+
+end
+
+function WLED.WSDataReceived(data)
+    
+     data = JSON:decode(data)
+	
+	if (data["state"]["on"]) then
+	   brightness = data["state"]["bri"]
+	   brightness = ConversionScale100(brightness)
+     else
+	   brightness = 0
+     end
+	
+	mainseg = data["state"]["mainseg"] + 1
+	
+	basecolor = data["state"]["seg"][mainseg]["col"][1]
+	
+	r = basecolor[1]
+	g = basecolor[2]
+     b = basecolor[3]
+	
+	x,y = C4:ColorRGBtoXY(r, g, b)
+	
+	brightnessData = {
+	   LIGHT_BRIGHTNESS_CURRENT = brightness
+     }
+	
+     colorData = {
+
+	   LIGHT_COLOR_CURRENT_X = x,
+	   LIGHT_COLOR_CURRENT_Y = y,
+
+     }
+    
+     C4:SendToProxy(5001,"LIGHT_BRIGHTNESS_CHANGED",brightnessData)
+	C4:SendToProxy(5001,"LIGHT_COLOR_CHANGED",colorData)
+
 
 end
