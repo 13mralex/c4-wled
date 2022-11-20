@@ -11,6 +11,12 @@ do	--Globals
 	DeviceProperty = "Device Address "
 	MaxDevices = 10
 	NumDevices = tonumber(Properties["Number of Additional Devices"])
+	RetryCount = 0
+	MaxRetries = 5
+	ReconnectTimer = nil
+	effects = {}
+	effectsRev = {}
+	EFFECT_SELECT = {}
 end
 
 function dbg (strDebugText, ...)
@@ -30,6 +36,7 @@ function OnDriverInit()
 	C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=false})
 	
 	UpdateAdditionalDevices()
+
 	ConnectWebsocket()
 	
 
@@ -104,17 +111,24 @@ function ConnectWebsocket()
 
 	local est = function (self)
 		dbg ('ws connection established')
-		C4:UpdateProperty("Websocket State", "Connected")
+		WLED.ConnectionState(true)
+	end
+
+	local offline = function (self)
+		dbg ('ws connection established')
+		WLED.ConnectionState(false)
 	end
 
 	PersistData["WLEDSocket"]:SetEstablishedFunction (est)
+	PersistData["WLEDSocket"]:SetOfflineFunction (offline)
 
 	local closed = function (self)
 		dbg ('ws connection closed by remote host')
-		C4:UpdateProperty("Websocket State", "Disconnected")
+		WLED.ConnectionState(false)
 	end
 
 	PersistData["WLEDSocket"]:SetClosedByRemoteFunction (closed)
+
 
 	PersistData["WLEDSocket"]:Start ()
 
@@ -328,9 +342,11 @@ function EC.refresh_device()
 end
 
 function EC.reboot_devices()
-
      WLED.GetURL("/win&RB","reboot")
+end
 
+function EC.Set_Effect(tParams)
+	WLED.SetEffect(tParams["Effect"])
 end
 
 function OnPropertyChanged (strProperty)
@@ -369,7 +385,7 @@ end
 function OPC.Primary_Device_Address(value)
      dbg("Device address changed to "..value)
 	WLED.GetDeviceInfo()
-
+	ConnectWebsocket()
 end
 
 function OPC.Number_of_Additional_Devices(value)
@@ -470,20 +486,46 @@ function WLED.PostURL(uri,data,source)
 end
 
 function WLED.GetDeviceInfo()
-     WLED.GetURL("/json/info","GetDeviceInfo")
+     WLED.GetURL("/json","GetDeviceInfo")
 end
 
 function WLED.PopulateDeviceInfo(response)
     
     data = JSON:decode(response)
+
+	state = data["state"]
+	info = data["info"]
+	effects = data["effects"]
+	palettes = data["palettes"]
+
+	--Update Properties
     
-    C4:UpdateProperty("Name", data["name"])
-    C4:UpdateProperty("WLED Version", data["ver"])
-    C4:UpdateProperty("Chip Type", data["arch"])
+    C4:UpdateProperty("Name", info["name"])
+    C4:UpdateProperty("WLED Version", info["ver"])
+    C4:UpdateProperty("Chip Type", info["arch"])
     
     if (Properties["Auto Name Driver"] == "On") then
-	   C4:RenameDevice(ProxyID, data["name"])
+	   C4:RenameDevice(ProxyID, info["name"])
     end
+
+
+	--Update Effects
+
+	--Reverse list
+	effectsRev = {}
+	for index,name in orderedPairs(effects) do
+		effectsRev[name] = index-1
+	end
+
+	local effectList = ""
+
+	for effectIndex, effectName in orderedPairs(effects) do
+		effectList = effectList..effectName..","
+	end
+
+	effectList = effectList:sub(1, -2)
+
+	C4:UpdatePropertyList("Default Effect", effectList)
     
     --DynamicCapabilities = {}
     
@@ -497,8 +539,25 @@ function WLED.PopulateDeviceInfo(response)
 	    
 	    
     --C4:SendToProxy(5001, "DYANAMIC_CAPABILITIES_CHANGED", DynamicCapabilities)
-    C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=true})
+    --C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=true})
 
+end
+
+function EffectSelection(currentValue)
+
+	for k,v in pairs(EFFECT_SELECT) do EFFECT_SELECT[k] = nil end -- clear table!
+	for effectIndex, effectName in orderedPairs(effects) do
+		table.insert(EFFECT_SELECT, { text = effectName, value = effectIndex })
+	end
+
+	return EFFECT_SELECT
+
+end
+
+function WLED.SetEffect(fx)
+	SetStr = "/win&FX="..fx
+	WLED.GetURL(SetStr,"SetEffect")
+	dbg("Setting effect to "..effects[tonumber(fx)])
 end
 
 function WLED.SetLevel(level,time)
@@ -552,8 +611,8 @@ end
 
 function WLED.SetColor(tParams)
 	
-	x = tParams["LIGHT_COLOR_TARGET_X"]
-	y = tParams["LIGHT_COLOR_TARGET_Y"]
+	x1 = tParams["LIGHT_COLOR_TARGET_X"]
+	y1 = tParams["LIGHT_COLOR_TARGET_Y"]
 	
 	mode = tonumber(tParams["LIGHT_COLOR_TARGET_MODE"])
 	rate = tParams["RATE"]
@@ -563,11 +622,22 @@ function WLED.SetColor(tParams)
 	
 	if (mode == 0 or mode == 1) then
 	
-	    r,g,b = C4:ColorXYtoRGB (x, y)
+		c2 = Properties["Color Palette 2"]
+		c3 = Properties["Color Palette 3"]
+
+	    r1,g1,b1 = C4:ColorXYtoRGB(x1,y1)
+		r2,g2,b2 = c2:match("([^,]+),([^,]+),([^,]+)")
+		r3,g3,b3 = c3:match("([^,]+),([^,]+),([^,]+)")
+
+		c1 = rgb_to_hex(r1,g1,b1)
+		c2 = rgb_to_hex(r2,g2,b2)
+		c3 = rgb_to_hex(r3,g3,b3)
+
+		fx = effectsRev[Properties["Default Effect"]]
 	    
-	    SetStr = "/win&R="..r.."&G="..g.."&B="..b.."&TT="..rate
+	    SetStr = "/win&TT="..rate.."&CL=h"..c1.."&C2=h"..c2.."&C3=h"..c3.."&FX="..fx
 	    
-	    dbg("Setting color to "..r..","..g..","..b.." over "..rate.."ms")
+	    dbg("Setting color to "..r1..","..g1..","..b1.." over "..rate.."ms")
 	
      --else
 	--    k = C4:ColorXYtoCCT (x, y)
@@ -582,8 +652,8 @@ function WLED.SetColor(tParams)
 	
 	dataToSend = {
 
-	   LIGHT_COLOR_CURRENT_X = x,
-	   LIGHT_COLOR_CURRENT_Y = y,
+	   LIGHT_COLOR_CURRENT_X = x1,
+	   LIGHT_COLOR_CURRENT_Y = y1,
 	   LIGHT_COLOR_CURRENT_COLOR_MODE = mode,
 	   RATE = rate
 
@@ -594,9 +664,52 @@ function WLED.SetColor(tParams)
 
 end
 
+function WLED.ConnectionState(connected)
+
+	if (connected) then
+		C4:UpdateProperty("Websocket State", "Connected")
+		C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=true})
+		dbg("WS reports online state")
+	else
+		C4:UpdateProperty("Websocket State", "Disconnected")
+		C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=false})
+		dbg("WS reports offline state")
+	end
+
+	if (not connected and ReconnectTimer == nil) then
+		dbg("Starting reconnect timer.")
+		ReconnectTimer = C4:SetTimer(10000,WLED.AttemptReconnect,true)
+	end
+
+end
+
+function WLED.AttemptReconnect()
+	RetryCount = RetryCount + 1
+
+	local state = Properties["Websocket State"]
+
+	if (RetryCount > MaxRetries) then
+		ReconnectTimer:Cancel()
+		ReconnectTimer = nil
+		dbg("Stopping reconnection: Max retry count reached")
+		C4:UpdateProperty("Websocket State", "Disconnected: Max reconnect attempts reached")
+	elseif (state == "Connected") then
+		ReconnectTimer:Cancel()
+		ReconnectTimer = nil
+		dbg("Stopping reconnection: Connection has been restored.")
+	else
+		local str = "Reconnect attempt #"..RetryCount
+		dbg(str)
+		C4:UpdateProperty("Websocket State", str)
+		ConnectWebsocket()
+	end
+
+end
+
 function WLED.WSDataReceived(data)
     
      data = JSON:decode(data)
+
 	
 	if (data["state"]["on"]) then
 	   brightness = data["state"]["bri"]
@@ -630,4 +743,46 @@ function WLED.WSDataReceived(data)
 	C4:SendToProxy(5001,"LIGHT_COLOR_CHANGED",colorData)
 
 
+end
+
+function rgb_to_hex(r, g, b)
+    --%02x: 0 means replace " "s with "0"s, 2 is width, x means hex
+	return string.format("%02x%02x%02x", 
+		math.floor(r),
+		math.floor(g),
+		math.floor(b))
+end
+
+function __genOrderedIndex(t)
+    local orderedIndex = {}
+    for key in pairs(t) do
+        table.insert( orderedIndex, key )
+    end
+    table.sort( orderedIndex, cmp_multitype )
+    return orderedIndex
+end
+
+function orderedNext(t, state)
+    local key = nil
+    if state == nil then
+        t.__orderedIndex = __genOrderedIndex( t )
+        key = t.__orderedIndex[1]
+    else
+        for i = 1,table.getn(t.__orderedIndex) do
+            if t.__orderedIndex[i] == state then
+                key = t.__orderedIndex[i+1]
+            end
+        end
+    end
+
+    if key then
+        return key, t[key]
+    end
+
+    t.__orderedIndex = nil
+    return
+end
+
+function orderedPairs(t)
+    return orderedNext, t, nil
 end
