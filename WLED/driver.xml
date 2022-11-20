@@ -5,7 +5,7 @@
   <name>WLED IP Control - debug</name>
   <model>WLED</model>
   <created>11/19/2022 9:02:59 PM</created>
-  <modified>11/19/2022 8:01:33 PM</modified>
+  <modified>11/19/2022 8:40:48 PM</modified>
   <version>101000</version>
   <semver>1.1.0</semver>
   <agent>false</agent>
@@ -97,7 +97,8 @@
     </connection>
   </connections>
   <config>
-    <script file="script.lua"/>
+    <script file="driver.lua"/>
+    <documentation file="www/documentation.html"/>
     <commands>
       <command>
         <name>Set Effect</name>

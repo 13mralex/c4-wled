@@ -669,6 +669,7 @@ function WLED.ConnectionState(connected)
 	if (connected) then
 		C4:UpdateProperty("Websocket State", "Connected")
 		C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=true})
+		RetryCount = 0
 		dbg("WS reports online state")
 	else
 		C4:UpdateProperty("Websocket State", "Disconnected")

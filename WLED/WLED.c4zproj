@@ -2,6 +2,6 @@
  <Items>
   <Item type="dir" c4zDir="drivers-common-public" name="drivers-common-public" recurse="true" exclude="false" />
   <Item type="file" name="driver.xml" />
-  <Item type="file" name="script.lua" />
+  <Item type="file" name="driver.lua" />
  </Items>
 </Driver>
