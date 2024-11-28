@@ -2,11 +2,11 @@
   <copyright>Copyright 2022</copyright>
   <creator>Alex Martin</creator>
   <manufacturer>AirCookie</manufacturer>
-  <name>WLED IP Control - debug</name>
+  <name>WLED IP Control</name>
   <model>WLED</model>
   <created>11/19/2022 9:02:59 PM</created>
-  <modified>11/19/2022 8:40:48 PM</modified>
-  <version>101000</version>
+  <modified>11/27/2024 8:56 PM</modified>
+  <version>2</version>
   <semver>1.1.0</semver>
   <agent>false</agent>
   <small>devices_sm/c4.gif</small>
@@ -97,8 +97,8 @@
     </connection>
   </connections>
   <config>
-    <script file="driver.lua"/>
-    <documentation file="www/documentation.html"/>
+    <script file="driver.lua" />
+    <documentation file="www/documentation.html" />
     <commands>
       <command>
         <name>Set Effect</name>
@@ -117,7 +117,7 @@
           <param>
             <name>Preset ID</name>
             <type>STRING</type>
-            <default/>
+            <default />
           </param>
         </params>
       </command>
@@ -145,7 +145,16 @@
       <property>
         <name>Primary Device Address</name>
         <type>STRING</type>
-        <default/>
+        <default />
+      </property>
+      <property>
+        <name>Communication Mode</name>
+        <type>LIST</type>
+        <default>HTTP</default>
+        <items>
+          <item>HTTP</item>
+          <item>Websocket</item>
+        </items>
       </property>
       <property>
         <name>Device Info</name>
@@ -155,25 +164,25 @@
       <property>
         <name>Name</name>
         <type>STRING</type>
-        <default/>
+        <default />
         <readonly>true</readonly>
       </property>
       <property>
         <name>WLED Version</name>
         <type>STRING</type>
-        <default/>
+        <default />
         <readonly>true</readonly>
       </property>
       <property>
         <name>Chip Type</name>
         <type>STRING</type>
-        <default/>
+        <default />
         <readonly>true</readonly>
       </property>
       <property>
         <name>Websocket State</name>
         <type>STRING</type>
-        <default/>
+        <default />
         <readonly>true</readonly>
       </property>
       <property>
@@ -222,52 +231,52 @@
       <property>
         <name>Device Address 1</name>
         <type>STRING</type>
-        <default/>
+        <default />
       </property>
       <property>
         <name>Device Address 2</name>
         <type>STRING</type>
-        <default/>
+        <default />
       </property>
       <property>
         <name>Device Address 3</name>
         <type>STRING</type>
-        <default/>
+        <default />
       </property>
       <property>
         <name>Device Address 4</name>
         <type>STRING</type>
-        <default/>
+        <default />
       </property>
       <property>
         <name>Device Address 5</name>
         <type>STRING</type>
-        <default/>
+        <default />
       </property>
       <property>
         <name>Device Address 6</name>
         <type>STRING</type>
-        <default/>
+        <default />
       </property>
       <property>
         <name>Device Address 7</name>
         <type>STRING</type>
-        <default/>
+        <default />
       </property>
       <property>
         <name>Device Address 8</name>
         <type>STRING</type>
-        <default/>
+        <default />
       </property>
       <property>
         <name>Device Address 9</name>
         <type>STRING</type>
-        <default/>
+        <default />
       </property>
       <property>
         <name>Device Address 10</name>
         <type>STRING</type>
-        <default/>
+        <default />
       </property>
     </properties>
   </config>

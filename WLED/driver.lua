@@ -37,7 +37,9 @@ function OnDriverInit()
 	
 	UpdateAdditionalDevices()
 
-	ConnectWebsocket()
+     if (Properties["Communication Mode"] == "Websocket") then
+	   ConnectWebsocket()
+	end
 	
 
 end
@@ -48,6 +50,10 @@ function OnDriverLateInit()
 	
 	DeviceID = C4:GetDeviceID()
 	ProxyID = C4:GetProxyDevicesById(DeviceID)
+	
+	if (Properties["Communication Mode"] == "HTTP") then
+	   WLED.SetConnectionState(true)
+	end
 
      WLED.GetDeviceInfo()
 
@@ -111,12 +117,12 @@ function ConnectWebsocket()
 
 	local est = function (self)
 		dbg ('ws connection established')
-		WLED.ConnectionState(true)
+		WLED.WSConnectionState(true)
 	end
 
 	local offline = function (self)
 		dbg ('ws connection established')
-		WLED.ConnectionState(false)
+		WLED.WSConnectionState(false)
 	end
 
 	PersistData["WLEDSocket"]:SetEstablishedFunction (est)
@@ -124,7 +130,7 @@ function ConnectWebsocket()
 
 	local closed = function (self)
 		dbg ('ws connection closed by remote host')
-		WLED.ConnectionState(false)
+		WLED.WSConnectionState(false)
 	end
 
 	PersistData["WLEDSocket"]:SetClosedByRemoteFunction (closed)
@@ -156,7 +162,7 @@ function ReceivedFromProxy (idBinding, strCommand, tParams)
      local success, ret
 	--strProperty = string.gsub (strProperty, '%s+', '_')
 	if (RFP and RFP [strCommand] and type (RFP [strCommand]) == 'function') then
-		success, ret = pcall (RFP [strCommand], tParams)
+		success, ret = pcall (RFP [strCommand], tParams, idBinding)
 	end
 	if (success == true) then
 		return (ret)
@@ -200,8 +206,8 @@ function RFP.BUTTON_ACTION(tParams)
      buttonId = tonumber(tParams["BUTTON_ID"])
 	buttonAction = tonumber(tParams["ACTION"])
 	
-	--dbg("button id: "..buttonId)
-	--dbg("button action: "..buttonAction)
+	dbg("button id: "..buttonId)
+	dbg("button action: "..buttonAction)
 
      if (buttonId == 0) then -- Top
 	
@@ -235,6 +241,16 @@ function RFP.BUTTON_ACTION(tParams)
 	
 	end
 
+end
+
+function RFP.DO_CLICK(tParams, idBinding)
+     if (idBinding == 300) then -- Top
+	   WLED.Power("on")
+	elseif (idBinding == 301) then -- Toggle
+	   WLED.Power("toggle")
+     elseif (idBinding == 303) then -- Bottom
+	   WLED.Power("off")
+     end
 end
 
 function RFP.SET_PRESET_LEVEL(tParams)
@@ -569,15 +585,22 @@ function WLED.SetLevel(level,time)
 	
 	WLED.GetURL(SetStr,"SetLevel")
 	
-	dataToSend = {
-	    LIGHT_BRIGHTNESS_CURRENT = currentLevel,
-	    LIGHT_BRIGHTNESS_TARGET = level,
-	    RATE = time
-     }
-	
 	dbg("Setting level to "..level.." over "..time.."ms")
 	
-	C4:SendToProxy(5001,"LIGHT_BRIGHTNESS_CHANGING",dataToSend)
+	if (Properties["Communication Mode"] == "HTTP") then
+	    brightnessData = {
+		  LIGHT_BRIGHTNESS_CURRENT = level,
+		  RATE = time
+	    }
+	    C4:SendToProxy(5001,"LIGHT_BRIGHTNESS_CHANGED",brightnessData)
+	else
+	    brightnessData = {
+		   LIGHT_BRIGHTNESS_CURRENT = currentLevel,
+		   LIGHT_BRIGHTNESS_TARGET = level,
+		   RATE = time
+	    }
+	    C4:SendToProxy(5001,"LIGHT_BRIGHTNESS_CHANGING",brightnessData)
+     end
 
 end
 
@@ -659,21 +682,25 @@ function WLED.SetColor(tParams)
 
     }
 
+	if (Properties["Communication Mode"] == "HTTP") then
+	   C4:SendToProxy(5001,"LIGHT_COLOR_CHANGED",dataToSend)
+	else
+	   C4:SendToProxy(5001,"LIGHT_COLOR_CHANGING",dataToSend)
+     end
 	
-	C4:SendToProxy(5001,"LIGHT_COLOR_CHANGING",dataToSend)
 
 end
 
-function WLED.ConnectionState(connected)
+function WLED.WSConnectionState(connected)
 
 	if (connected) then
 		C4:UpdateProperty("Websocket State", "Connected")
-		C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=true})
+		WLED.SetConnectionState(true)
 		RetryCount = 0
 		dbg("WS reports online state")
 	else
 		C4:UpdateProperty("Websocket State", "Disconnected")
-		C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=false})
+		WLED.SetConnectionState(false)
 		dbg("WS reports offline state")
 	end
 
@@ -682,6 +709,10 @@ function WLED.ConnectionState(connected)
 		ReconnectTimer = C4:SetTimer(10000,WLED.AttemptReconnect,true)
 	end
 
+end
+
+function WLED.SetConnectionState(state)
+    C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=state})
 end
 
 function WLED.AttemptReconnect()
