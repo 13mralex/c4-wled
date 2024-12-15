@@ -5,8 +5,8 @@
   <name>WLED IP Control</name>
   <model>WLED</model>
   <created>11/19/2022 9:02:59 PM</created>
-  <modified>11/27/2024 8:56 PM</modified>
-  <version>2</version>
+  <modified>12/14/2024 2:00:00 PM</modified>
+  <version>3</version>
   <semver>1.1.0</semver>
   <agent>false</agent>
   <small>devices_sm/c4.gif</small>
@@ -97,8 +97,8 @@
     </connection>
   </connections>
   <config>
-    <script file="driver.lua" />
-    <documentation file="www/documentation.html" />
+    <script file="driver.lua"/>
+    <documentation file="www/documentation.html"/>
     <commands>
       <command>
         <name>Set Effect</name>
@@ -117,7 +117,7 @@
           <param>
             <name>Preset ID</name>
             <type>STRING</type>
-            <default />
+            <default/>
           </param>
         </params>
       </command>
@@ -145,7 +145,7 @@
       <property>
         <name>Primary Device Address</name>
         <type>STRING</type>
-        <default />
+        <default/>
       </property>
       <property>
         <name>Communication Mode</name>
@@ -164,25 +164,25 @@
       <property>
         <name>Name</name>
         <type>STRING</type>
-        <default />
+        <default/>
         <readonly>true</readonly>
       </property>
       <property>
         <name>WLED Version</name>
         <type>STRING</type>
-        <default />
+        <default/>
         <readonly>true</readonly>
       </property>
       <property>
         <name>Chip Type</name>
         <type>STRING</type>
-        <default />
+        <default/>
         <readonly>true</readonly>
       </property>
       <property>
         <name>Websocket State</name>
         <type>STRING</type>
-        <default />
+        <default/>
         <readonly>true</readonly>
       </property>
       <property>
@@ -203,6 +203,13 @@
         <name>Default Effect</name>
         <type>DYNAMIC_LIST</type>
         <default>Solid</default>
+      </property>
+	 <property>
+        <name>White Color Temperature</name>
+        <type>RANGED_INTEGER</type>
+        <minimum>2700</minimum>
+        <maximum>6500</maximum>
+        <default>5000</default>
       </property>
       <property>
         <name>Color Palette 2</name>
@@ -231,52 +238,52 @@
       <property>
         <name>Device Address 1</name>
         <type>STRING</type>
-        <default />
+        <default/>
       </property>
       <property>
         <name>Device Address 2</name>
         <type>STRING</type>
-        <default />
+        <default/>
       </property>
       <property>
         <name>Device Address 3</name>
         <type>STRING</type>
-        <default />
+        <default/>
       </property>
       <property>
         <name>Device Address 4</name>
         <type>STRING</type>
-        <default />
+        <default/>
       </property>
       <property>
         <name>Device Address 5</name>
         <type>STRING</type>
-        <default />
+        <default/>
       </property>
       <property>
         <name>Device Address 6</name>
         <type>STRING</type>
-        <default />
+        <default/>
       </property>
       <property>
         <name>Device Address 7</name>
         <type>STRING</type>
-        <default />
+        <default/>
       </property>
       <property>
         <name>Device Address 8</name>
         <type>STRING</type>
-        <default />
+        <default/>
       </property>
       <property>
         <name>Device Address 9</name>
         <type>STRING</type>
-        <default />
+        <default/>
       </property>
       <property>
         <name>Device Address 10</name>
         <type>STRING</type>
-        <default />
+        <default/>
       </property>
     </properties>
   </config>

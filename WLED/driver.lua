@@ -17,10 +17,11 @@ do	--Globals
 	effects = {}
 	effectsRev = {}
 	EFFECT_SELECT = {}
+	info = {}
 end
 
 function dbg (strDebugText, ...)
-     if (Properties["Debug Mode"] == 'On') then
+    if (Properties["Debug Mode"] == 'On') then
 		DEBUGPRINT = true
 	end
 
@@ -28,73 +29,51 @@ function dbg (strDebugText, ...)
 end
 
 function OnDriverInit()
-
-     --C4:AddVariable("PRESET_LEVEL",0,"NUMBER",false,true)
-	--C4:AddVariable("CLICK_RATE_UP",0,"NUMBER",false,true)
-	--C4:AddVariable("CLICK_RATE_DOWN",0,"NUMBER",false,true)
-	
 	C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=false})
 	
 	UpdateAdditionalDevices()
 
-     if (Properties["Communication Mode"] == "Websocket") then
-	   ConnectWebsocket()
+	if (Properties["Communication Mode"] == "Websocket") then
+		ConnectWebsocket()
 	end
-	
-
 end
 
 function OnDriverLateInit()
-
-     dbg("On driver late init...")
+    dbg("On driver late init...")
 	
 	DeviceID = C4:GetDeviceID()
 	ProxyID = C4:GetProxyDevicesById(DeviceID)
-	
+
 	if (Properties["Communication Mode"] == "HTTP") then
-	   WLED.SetConnectionState(true)
+		WLED.ConnectionState(true)
 	end
 
-     WLED.GetDeviceInfo()
-
+	WLED.GetDeviceInfo()
 end
 
 function ConversionScale(level)
-
-     level = tonumber(level)
-     level = (level/100)*255
-     level = math.floor(level)
+    level = tonumber(level)
+    level = (level/100)*255
+    level = math.floor(level)
 	return level
-
 end
 
 function ConversionScale100(level)
-
-     level = tonumber(level)
-     level = (level/255)*100
-     level = math.floor(level)
+    level = tonumber(level)
+    level = (level/255)*100
+    level = math.floor(level)
 	return level
-
 end
 
 function UpdateAdditionalDevices()
-
-     NumDevices = tonumber(Properties["Number of Additional Devices"])
-
+	NumDevices = tonumber(Properties["Number of Additional Devices"])
 	for i = 1,MaxDevices,1 do
-
 	    if (i <= NumDevices) then
-	    
 		   C4:SetPropertyAttribs(DeviceProperty..i, 0)
-	    
 	    else
-	    
 		   C4:SetPropertyAttribs(DeviceProperty..i, 1)
-	    
-	    end
-
-     end
-
+		end
+    end
 end
 
 function ConnectWebsocket()
@@ -117,12 +96,12 @@ function ConnectWebsocket()
 
 	local est = function (self)
 		dbg ('ws connection established')
-		WLED.WSConnectionState(true)
+		WLED.ConnectionState(true)
 	end
 
 	local offline = function (self)
 		dbg ('ws connection established')
-		WLED.WSConnectionState(false)
+		WLED.ConnectionState(false)
 	end
 
 	PersistData["WLEDSocket"]:SetEstablishedFunction (est)
@@ -130,11 +109,10 @@ function ConnectWebsocket()
 
 	local closed = function (self)
 		dbg ('ws connection closed by remote host')
-		WLED.WSConnectionState(false)
+		WLED.ConnectionState(false)
 	end
 
 	PersistData["WLEDSocket"]:SetClosedByRemoteFunction (closed)
-
 
 	PersistData["WLEDSocket"]:Start ()
 
@@ -162,7 +140,7 @@ function ReceivedFromProxy (idBinding, strCommand, tParams)
      local success, ret
 	--strProperty = string.gsub (strProperty, '%s+', '_')
 	if (RFP and RFP [strCommand] and type (RFP [strCommand]) == 'function') then
-		success, ret = pcall (RFP [strCommand], tParams, idBinding)
+		success, ret = pcall (RFP [strCommand], tParams)
 	end
 	if (success == true) then
 		return (ret)
@@ -172,133 +150,95 @@ function ReceivedFromProxy (idBinding, strCommand, tParams)
 end
 
 function RFP.RAMP_TO_LEVEL(tParams)
-
-     level = tParams["LEVEL"]
+    level = tParams["LEVEL"]
 	time = tParams["TIME"]
 
-     dbg("Ramping to "..level.." over "..time.."ms")
+    dbg("Ramping to "..level.." over "..time.."ms")
 	
 	WLED.SetLevel(level,time)
-	
 end
 
 function RFP.SET_LEVEL(tParams)
-
-     level = tParams["LEVEL"] 
+    level = tParams["LEVEL"] 
 	time = tParams["TIME"] or 0
 
-     dbg("Setting level to "..level.." over "..time.."ms")
+    dbg("Setting level to "..level.." over "..time.."ms")
 	
 	WLED.SetLevel(level,time)
-	
 end
 
 function RFP.ON()
-     WLED.Power("on")
+    WLED.Power("on")
 end
 
 function RFP.OFF()
-     WLED.Power("off")
+    WLED.Power("off")
 end
 
 function RFP.BUTTON_ACTION(tParams)
-
-     buttonId = tonumber(tParams["BUTTON_ID"])
+    buttonId = tonumber(tParams["BUTTON_ID"])
 	buttonAction = tonumber(tParams["ACTION"])
-	
-	dbg("button id: "..buttonId)
-	dbg("button action: "..buttonAction)
 
-     if (buttonId == 0) then -- Top
-	
-	   if (buttonAction == 1) then -- Press
-		  WLED.Power("on")
-	   
-	   elseif (buttonAction == 0) then -- Release
-
-	   end
-	   
-	
+    if (buttonId == 0) then -- Top
+		if (buttonAction == 1) then -- Press
+			WLED.Power("on")
+		elseif (buttonAction == 0) then -- Release
+		end
 	elseif (buttonId == 1) then -- Bottom
-	
-	   if (buttonAction == 1) then -- Press
-	   
-		  WLED.Power("off")
-	   
-	   elseif (buttonAction == 0) then -- Release
-	   
-	   end
-	
+		if (buttonAction == 1) then -- Press
+			WLED.Power("off")
+		elseif (buttonAction == 0) then -- Release
+		end
 	elseif (buttonId == 2) then -- Toggle
-	
-	   if (buttonAction == 1) then -- Press
-	   
-		  WLED.Power("toggle")
-	   
-	   elseif (buttonAction == 0) then -- Release
-	   
-	   end
-	
+	   	if (buttonAction == 1) then -- Press
+			WLED.Power("toggle")
+		elseif (buttonAction == 0) then -- Release
+		end
 	end
-
 end
 
 function RFP.DO_CLICK(tParams, idBinding)
-     if (idBinding == 300) then -- Top
-	   WLED.Power("on")
-	elseif (idBinding == 301) then -- Toggle
-	   WLED.Power("toggle")
-     elseif (idBinding == 303) then -- Bottom
-	   WLED.Power("off")
-     end
+	if (idBinding == 300) then -- Top
+		WLED.Power("on")
+   	elseif (idBinding == 301) then -- Toggle
+		WLED.Power("toggle")
+	elseif (idBinding == 303) then -- Bottom
+		WLED.Power("off")
+	end
 end
 
 function RFP.SET_PRESET_LEVEL(tParams)
-
-     PersistData["PRESET_LEVEL"] = tParams["LEVEL"]
-
+	PersistData["PRESET_LEVEL"] = tParams["LEVEL"]
 end
 
 function RFP.SET_CLICK_RATE_UP(tParams)
-
-     PersistData["CLICK_RATE_UP"] = tParams["RATE"]
-
+    PersistData["CLICK_RATE_UP"] = tParams["RATE"]
 end
 
 function RFP.SET_CLICK_RATE_DOWN(tParams)
-
-     PersistData["CLICK_RATE_DOWN"] = tParams["RATE"]
-
+    PersistData["CLICK_RATE_DOWN"] = tParams["RATE"]
 end
 
 function RFP.SET_COLOR_TARGET(tParams)
-
-     WLED.SetColor(tParams)
-
+	WLED.SetColor(tParams)
 end
 
 function RFP.PUSH_SCENE(tParams)
-
-     SceneID = tonumber(tParams["SCENE_ID"])
-
-     PersistData["Scenes"][SceneID] = tParams
-
+    SceneID = tonumber(tParams["SCENE_ID"])
+    PersistData["Scenes"][SceneID] = tParams
 end
 
 function RFP.ACTIVATE_SCENE(tParams)
+    SceneID = tParams["SCENE_ID"]
 
-     SceneID = tParams["SCENE_ID"]
-
-     elements = PersistData["Scenes"][tonumber(SceneID)]["ELEMENTS"]
+    elements = PersistData["Scenes"][tonumber(SceneID)]["ELEMENTS"]
 	elements = C4:ParseXml(elements)
 	
 	data = {}
 	
 	for k,v in pairs(elements.ChildNodes) do
-
 	    data[v["Name"]] = v["Value"]
-
-     end
+    end
 	
 	if (data["brightnessEnabled"] == "True") then
 	 
@@ -306,9 +246,9 @@ function RFP.ACTIVATE_SCENE(tParams)
 	   
 	   WLED.SetLevel(data["brightness"],data["brightnessRate"])
 
-     end
+    end
 	
-     if (data["colorEnabled"] == "True") then
+    if (data["colorEnabled"] == "True") then
 	
 	   dbg("Color mode enabled")
 	   colorData = {}
@@ -319,8 +259,7 @@ function RFP.ACTIVATE_SCENE(tParams)
 	   
 	   WLED.SetColor(colorData)
 	
-     end
-
+    end
 end
 
 function ExecuteCommand (strCommand, tParams)
@@ -352,17 +291,23 @@ function ExecuteCommand (strCommand, tParams)
 end
 
 function EC.refresh_device()
-     dbg("Refreshing Device")
-     WLED.GetDeviceInfo()
-	ConnectWebsocket()
+    dbg("Refreshing Device")
+    WLED.GetDeviceInfo()
+	if (Properties["Communication Mode"] == "Websocket") then
+		ConnectWebsocket()
+	end
 end
 
 function EC.reboot_devices()
-     WLED.GetURL("/win&RB","reboot")
+    WLED.GetURL("/win&RB","reboot")
 end
 
 function EC.Set_Effect(tParams)
 	WLED.SetEffect(tParams["Effect"])
+end
+
+function EC.Set_Preset(tParams)
+	WLED.SetPreset(tParams["Preset ID"])
 end
 
 function OnPropertyChanged (strProperty)
@@ -399,34 +344,29 @@ function OPC.Debug_Mode (value)
 end
 
 function OPC.Primary_Device_Address(value)
-     dbg("Device address changed to "..value)
+    dbg("Device address changed to "..value)
 	WLED.GetDeviceInfo()
-	ConnectWebsocket()
+	if (Properties["Communication Mode"] == "Websocket") then
+		ConnectWebsocket()
+	end
 end
 
 function OPC.Number_of_Additional_Devices(value)
-
-     UpdateAdditionalDevices()
-
+    UpdateAdditionalDevices()
 end
 
 function WLED.GetURL(uri,source)
 
-     urls = {}
+    urls = {}
 	
 	table.insert(urls,Properties["Primary Device Address"]..uri)
 
 	if (source ~= "GetDeviceInfo") then -- Only update primary device values
-	
 	    for i = 1,NumDevices,1 do
-
-		  url = Properties[DeviceProperty..i]..uri
-		  
-		  table.insert(urls,url)
-
+			url = Properties[DeviceProperty..i]..uri
+		  	table.insert(urls,url)
 	    end
-     end
-
+    end
 	
 	for i,url in pairs(urls) do
 	
@@ -464,9 +404,8 @@ end
 
 function WLED.PostURL(uri,data,source)
 
-     baseUrl = Properties["Primary Device Address"]
+    baseUrl = Properties["Primary Device Address"]
 	url = baseUrl..uri
-
 	
 	dbg ("---Get URL---")
 	dbg ("URL: "..url)
@@ -502,7 +441,7 @@ function WLED.PostURL(uri,data,source)
 end
 
 function WLED.GetDeviceInfo()
-     WLED.GetURL("/json","GetDeviceInfo")
+    WLED.GetURL("/json","GetDeviceInfo")
 end
 
 function WLED.PopulateDeviceInfo(response)
@@ -543,16 +482,35 @@ function WLED.PopulateDeviceInfo(response)
 
 	C4:UpdatePropertyList("Default Effect", effectList)
     
-    --DynamicCapabilities = {}
+    DynamicCapabilities = {}
     
-    --if (data["leds"]["rgbw"] and data["leds"]["wv"]) then
+    -- leds["lc"]
+    -- 0	None. Indicates a segment that does not have a bus within its range, e.g. because it is not active.
+    -- 1	Supports RGB
+    -- 2	Supports white channel only
+    -- 3	Supports RGBW
+    -- 4	Supports CCT only, no white channel (unused)
+    -- 5	Supports CCT + RGB, no white channel (unused)
+    -- 6	Supports CCT (including white channel)
+    -- 7	Supports CCT (including white channel) + RGB
+
+    -- leds["cct"]
+    -- 0	Segment supports RGB color
+    -- 1	Segment supports white channel
+    -- 2	Segment supports color temperature
+    -- 3-7	Reserved (expect any value)
+    
+    -- leds["wv"]
+    -- bool  Displays white channel slider (v10.0+)
+    
+    
+    --Still want the Color Temp slider in UI for RGB simulated color temp
+    
+    --if (leds["lc"] >= 4) then
 	--   DynamicCapabilities["supports_color_correlated_temperature"] = true
     --else
-	--   DynamicCapabilities["supports_color_correlated_temperature"] = false
+	 --  DynamicCapabilities["supports_color_correlated_temperature"] = false
     --end
-    
-    
-	    
 	    
     --C4:SendToProxy(5001, "DYANAMIC_CAPABILITIES_CHANGED", DynamicCapabilities)
     --C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=true})
@@ -576,14 +534,26 @@ function WLED.SetEffect(fx)
 	dbg("Setting effect to "..effects[tonumber(fx)])
 end
 
+function WLED.SetPreset(id)
+	SetStr = "/win&PL="..id
+	WLED.GetURL(SetStr,"SetPreset")
+	dbg("Setting preset to "..id)
+end
+
 function WLED.SetLevel(level,time)
 
-     scaledLevel = ConversionScale(level)
+    scaledLevel = ConversionScale(level)
 	currentLevel = C4:GetVariable(ProxyID, 1001)
 	
 	SetStr = "/win&A="..scaledLevel.."&TT="..time
 	
 	WLED.GetURL(SetStr,"SetLevel")
+	
+	dataToSend = {
+	    LIGHT_BRIGHTNESS_CURRENT = currentLevel,
+	    LIGHT_BRIGHTNESS_TARGET = level,
+	    RATE = time
+	}
 	
 	dbg("Setting level to "..level.." over "..time.."ms")
 	
@@ -605,31 +575,28 @@ function WLED.SetLevel(level,time)
 end
 
 function WLED.Power(state)
+    dbg("Setting WLED power to "..state)
 
-     dbg("Setting WLED power to "..state)
-
-     currentState = tonumber(C4:GetVariable(ProxyID, 1000))
+    currentState = tonumber(C4:GetVariable(ProxyID, 1000))
 	
-     rateUp = PersistData["CLICK_RATE_UP"]
+    rateUp = PersistData["CLICK_RATE_UP"]
 	rateDown = PersistData["CLICK_RATE_DOWN"]
 	--rateHold = C4:GetVariable(ProxyID, 1004)
 	
 	defaultLevel = C4:GetVariable(ProxyID, 1006)
 
-     if (state == "on") then
-	   WLED.SetLevel(defaultLevel,rateUp)
+    if (state == "on") then
+		WLED.SetLevel(defaultLevel,rateUp)
 	elseif (state == "off") then
-	   WLED.SetLevel(0,rateDown)
+		WLED.SetLevel(0,rateDown)
 	elseif (state == "toggle") then
-	    dbg("Current state: "..currentState)
-	   if (currentState ~= 0) then
-		  WLED.SetLevel(0,rateDown)
-	   else
-		  WLED.SetLevel(defaultLevel,rateUp)
-	   end
+		dbg("Current state: "..currentState)
+	   	if (currentState ~= 0) then
+			WLED.SetLevel(0,rateDown)
+	   	else
+			WLED.SetLevel(defaultLevel,rateUp)
+	   	end
 	end
-
-
 end
 
 function WLED.SetColor(tParams)
@@ -638,69 +605,110 @@ function WLED.SetColor(tParams)
 	y1 = tParams["LIGHT_COLOR_TARGET_Y"]
 	
 	mode = tonumber(tParams["LIGHT_COLOR_TARGET_MODE"])
-	rate = tParams["RATE"]
+	rate = tParams["RATE"] or tParams["LIGHT_COLOR_TARGET_RATE"]
 	
 	currentLevel = C4:GetVariable(ProxyID, 1001)
 	
+    temp = tonumber(Properties["White Color Temperature"])
 	
-	if (mode == 0 or mode == 1) then
+	fx = effectsRev[Properties["Default Effect"]]
 	
-		c2 = Properties["Color Palette 2"]
-		c3 = Properties["Color Palette 3"]
+    -- leds["lc"]
+    -- 0	None. Indicates a segment that does not have a bus within its range, e.g. because it is not active.
+    -- 1	Supports RGB
+    -- 2	Supports white channel only
+    -- 3	Supports RGBW
+    -- 4	Supports CCT only, no white channel (unused)
+    -- 5	Supports CCT + RGB, no white channel (unused)
+    -- 6	Supports CCT (including white channel)
+    -- 7	Supports CCT (including white channel) + RGB
 
-	    r1,g1,b1 = C4:ColorXYtoRGB(x1,y1)
-		r2,g2,b2 = c2:match("([^,]+),([^,]+),([^,]+)")
-		r3,g3,b3 = c3:match("([^,]+),([^,]+),([^,]+)")
-
-		c1 = rgb_to_hex(r1,g1,b1)
-		c2 = rgb_to_hex(r2,g2,b2)
-		c3 = rgb_to_hex(r3,g3,b3)
-
-		fx = effectsRev[Properties["Default Effect"]]
-	    
-	    SetStr = "/win&TT="..rate.."&CL=h"..c1.."&C2=h"..c2.."&C3=h"..c3.."&FX="..fx
-	    
-	    dbg("Setting color to "..r1..","..g1..","..b1.." over "..rate.."ms")
+    -- leds["cct"]
+    -- 0	Segment supports RGB color
+    -- 1	Segment supports white channel
+    -- 2	Segment supports color temperature
+    -- 3-7	Reserved (expect any value)
+    
+    -- leds["wv"]
+    -- bool  Displays white channel slider (v10.0+)
 	
-     --else
-	--    k = C4:ColorXYtoCCT (x, y)
-	    
-	 --   SetStr = "/win&LY="..k.."&TT="..rate
-	    
-	 --   dbg("Setting temperature to "..k.." over "..rate.."ms")
-	    
-     end
+    
+    --Check for CCT, if not suppored then go back to RGB
+    
+    leds = info["leds"]
+    
+    if (leds["lc"]) then
+	    if (leds["lc"] >= 4) then
+			modeNew = 1
+	    else
+			modeNew = 0	
+	    end
+    else
+	    modeNew = 0
+    end
+	
+	
+	if (modeNew == 0) then
+	
+	    --Only use white channel if CCT isn't supported, but the default while K value is selected
+	    --This sets RGB to 0 and W to 255 for accurate color
+	    k = C4:ColorXYtoCCT (x1, y1)
+	    k = tonumber(k)
+	    if (mode == 1 and temp == k and leds["lc"] == 3) then
+			dbg("Color temp called, k: "..k)
+			dbg("Default white color was set. Using only white channel.")
+	    	SetStr = "/win&TT="..rate.."&R=0&G=0&B=0&W=255&FX="..fx
+	    else
+			c2 = Properties["Color Palette 2"]
+			c3 = Properties["Color Palette 3"]
+
+			r1,g1,b1 = C4:ColorXYtoRGB(x1,y1)
+			r2,g2,b2 = c2:match("([^,]+),([^,]+),([^,]+)")
+			r3,g3,b3 = c3:match("([^,]+),([^,]+),([^,]+)")
+
+			c1 = rgb_to_hex(r1,g1,b1)
+			c2 = rgb_to_hex(r2,g2,b2)
+			c3 = rgb_to_hex(r3,g3,b3)
+			
+			SetStr = "/win&TT="..rate.."&CL=h"..c1.."&C2=h"..c2.."&C3=h"..c3.."&FX="..fx
+			
+			dbg("Setting color to "..r1..","..g1..","..b1.." over "..rate.."ms")
+		end
+	
+    else
+	    --k = C4:ColorXYtoCCT (x, y)
+	    SetStr = "/win&LY="..k.."&TT="..rate
+		dbg("Setting temperature to "..k.." over "..rate.."ms")
+    end
 	
 	WLED.GetURL(SetStr,"SetColor")
 	
 	dataToSend = {
-
 	   LIGHT_COLOR_CURRENT_X = x1,
 	   LIGHT_COLOR_CURRENT_Y = y1,
 	   LIGHT_COLOR_CURRENT_COLOR_MODE = mode,
 	   RATE = rate
-
     }
 
-	if (Properties["Communication Mode"] == "HTTP") then
-	   C4:SendToProxy(5001,"LIGHT_COLOR_CHANGED",dataToSend)
-	else
-	   C4:SendToProxy(5001,"LIGHT_COLOR_CHANGING",dataToSend)
-     end
 	
+	if (Properties["Communication Mode"] == "HTTP") then
+		C4:SendToProxy(5001,"LIGHT_COLOR_CHANGED",dataToSend)
+	else
+		C4:SendToProxy(5001,"LIGHT_COLOR_CHANGING",dataToSend)
+	end
 
 end
 
-function WLED.WSConnectionState(connected)
+function WLED.ConnectionState(connected)
 
 	if (connected) then
 		C4:UpdateProperty("Websocket State", "Connected")
-		WLED.SetConnectionState(true)
+		C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=true})
 		RetryCount = 0
 		dbg("WS reports online state")
 	else
 		C4:UpdateProperty("Websocket State", "Disconnected")
-		WLED.SetConnectionState(false)
+		C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=false})
 		dbg("WS reports offline state")
 	end
 
@@ -709,10 +717,6 @@ function WLED.WSConnectionState(connected)
 		ReconnectTimer = C4:SetTimer(10000,WLED.AttemptReconnect,true)
 	end
 
-end
-
-function WLED.SetConnectionState(state)
-    C4:SendToProxy(5001, "ONLINE_CHANGED", {STATE=state})
 end
 
 function WLED.AttemptReconnect()
@@ -740,15 +744,14 @@ end
 
 function WLED.WSDataReceived(data)
     
-     data = JSON:decode(data)
+    data = JSON:decode(data)
 
-	
 	if (data["state"]["on"]) then
-	   brightness = data["state"]["bri"]
-	   brightness = ConversionScale100(brightness)
-     else
-	   brightness = 0
-     end
+	   	brightness = data["state"]["bri"]
+	   	brightness = ConversionScale100(brightness)
+    else
+		brightness = 0
+    end
 	
 	mainseg = data["state"]["mainseg"] + 1
 	
@@ -756,25 +759,29 @@ function WLED.WSDataReceived(data)
 	
 	r = basecolor[1]
 	g = basecolor[2]
-     b = basecolor[3]
+    b = basecolor[3]
 	
-	x,y = C4:ColorRGBtoXY(r, g, b)
+	if (basecolor[4]) then
+		w = basecolor[4]
+    end
+	
+	if (w > 0) then
+		x,y = C4:ColorCCTtoXY(tonumber(Properties["White Color Temperature"]))
+	else
+	   x,y = C4:ColorRGBtoXY(r, g, b)
+	end
 	
 	brightnessData = {
-	   LIGHT_BRIGHTNESS_CURRENT = brightness
-     }
+		LIGHT_BRIGHTNESS_CURRENT = brightness
+    }
 	
-     colorData = {
-
-	   LIGHT_COLOR_CURRENT_X = x,
-	   LIGHT_COLOR_CURRENT_Y = y,
-
-     }
+    colorData = {
+	   	LIGHT_COLOR_CURRENT_X = x,
+	   	LIGHT_COLOR_CURRENT_Y = y,
+    }
     
-     C4:SendToProxy(5001,"LIGHT_BRIGHTNESS_CHANGED",brightnessData)
+    C4:SendToProxy(5001,"LIGHT_BRIGHTNESS_CHANGED",brightnessData)
 	C4:SendToProxy(5001,"LIGHT_COLOR_CHANGED",colorData)
-
-
 end
 
 function rgb_to_hex(r, g, b)
